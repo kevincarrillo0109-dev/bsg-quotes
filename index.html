@@ -15,11 +15,8 @@ input,select,textarea{font-family:inherit}
 @media(max-width:600px){
   .quote-header{flex-direction:column!important;align-items:flex-start!important;gap:12px!important}
   .quote-header-right{text-align:left!important}
-  .quote-wrap{padding:24px 16px!important}
-  .quote-table{font-size:11px!important}
-  .quote-table th,.quote-table td{padding:6px 8px!important}
   .totals-table{min-width:unset!important;width:100%!important}
-  .acorn-box{max-width:100%!important}
+  .financing-options{flex-direction:column!important}
 }
 </style>
 </head>
@@ -30,7 +27,7 @@ const LOGO_DATA="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST
 const SUPABASE_URL="https://uaygytbsccbavqutbttn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVheWd5dGJzY2NiYXZxdXRidHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MDU4MjcsImV4cCI6MjA5NDM4MTgyN30.Zdl7ItoPhc7aWuXzAnLZ8o2gDHmRzfwOpaqeAXVd0HE";
 const APP_URL="https://bsg-quotes.pages.dev";
-const ACORN_URL="https://www.acornfinance.com/pre-qualify/?d=GWFRY&utm_medium=web_pre_qual_link_copy_welcome";
+const ACORN_URL="https://www.acornfinance.com/pre-qualify/?d=AB6GZ&utm_medium=web_pre_qual_link";
 const hdrs={"Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":`Bearer ${SUPABASE_KEY}`};
 
 async function dbGetAll(){try{const r=await fetch(`${SUPABASE_URL}/rest/v1/quotes?select=*&order=created_at.desc`,{headers:hdrs});if(!r.ok)return[];return r.json();}catch{return[];}}
@@ -201,11 +198,13 @@ function PrintView({q,onBack}){
   const hasTrampoline=cats.has("trampoline");
   const showPool=hasPool&&!(q.editScope&&q.customScope);
   const showTrampoline=hasTrampoline&&!(q.editScope&&q.customScope);
+  const hasScope=showPool||showTrampoline||(q.editScope&&q.customScope);
+  const[scopeOpen,setScopeOpen]=React.useState(false);
 
   return(
     <div>
       <style>{`@media print{.no-print{display:none!important}.page-break{page-break-before:always}}`}</style>
-      <div style={{background:"#fff",minHeight:"100vh",fontFamily:"Georgia,serif",color:"#222",padding:"48px 56px",position:"relative",maxWidth:820,margin:"0 auto"}}>
+      <div style={{background:"#fff",minHeight:"100vh",fontFamily:"Georgia,serif",color:"#222",padding:"32px 20px",position:"relative",maxWidth:520,margin:"0 auto"}}>
         <Watermark/>
         <div style={{position:"relative",zIndex:1}}>
           {/* Header */}
@@ -226,34 +225,31 @@ function PrintView({q,onBack}){
           )}
           {q.client&&<div style={{marginBottom:12,fontSize:13}}><strong>Client:</strong> {q.client}{q.address?` — ${q.address}`:""}</div>}
           <p style={{fontStyle:"italic",fontSize:13,color:"#444",marginBottom:20,lineHeight:1.6}}>Thank you for the opportunity to provide you with this estimate. We appreciate your time and consideration, and we look forward to the possibility of working with you to bring your project to life. If you have any questions or would like to review options, please feel free to reach out at any time.</p>
-          {/* Line Items Table */}
-          <table className="quote-table" style={{width:"100%",borderCollapse:"collapse",marginBottom:20,fontSize:13}}>
-            <thead>
-              <tr style={{background:"#f0f3ec"}}>
-                {["Item","Description","Quantity","Price","Amount"].map(h=>(
-                  <th key={h} style={{border:"1px solid #ccc",padding:"10px 12px",textAlign:h==="Amount"||h==="Price"||h==="Quantity"?"center":"left",fontWeight:700,color:h==="Description"?"#4a5c3a":"#222"}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {q.items.map((item,i)=>{
-                const qty=Number(item.qty)||0;
-                const unit=Number(item.unit)||0;
-                const amt=qty*unit;
-                const cat=PRODUCTS[item.productKey]?PRODUCTS[item.productKey].category:"other";
-                const isTrampoline=cat==="trampoline";
-                return(
-                  <tr key={item.id} style={{background:i%2===0?"#fff":"#fafaf8",verticalAlign:"top"}}>
-                    <td style={{border:"1px solid #ccc",padding:"10px 12px",fontWeight:700}}>{item.itemName||"—"}</td>
-                    <td style={{border:"1px solid #ccc",padding:"10px 12px",color:"#444",whiteSpace:"pre-line"}}>{item.desc}</td>
-                    <td style={{border:"1px solid #ccc",padding:"10px 12px",textAlign:"center"}}>{isTrampoline?qty:`${qty} unit${qty!==1?"s":""}`}</td>
-                    <td style={{border:"1px solid #ccc",padding:"10px 12px",textAlign:"center"}}>{fmt(unit)}</td>
-                    <td style={{border:"1px solid #ccc",padding:"10px 12px",textAlign:"right",fontWeight:700}}>{fmt(amt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {/* Line Items Cards */}
+          <div style={{marginBottom:20}}>
+            {q.items.map((item)=>{
+              const qty=Number(item.qty)||0;
+              const unit=Number(item.unit)||0;
+              const amt=qty*unit;
+              const cat=PRODUCTS[item.productKey]?PRODUCTS[item.productKey].category:"other";
+              const isTrampoline=cat==="trampoline";
+              return(
+                <div key={item.id} style={{borderRadius:10,overflow:"hidden",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.08)"}}>
+                  <div style={{background:"#4a5c3a",padding:"11px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{color:"#fff",fontWeight:700,fontSize:14}}>{item.itemName||"—"}</span>
+                    <span style={{color:"#fff",fontWeight:700,fontSize:14,whiteSpace:"nowrap",marginLeft:12}}>{fmt(amt)}</span>
+                  </div>
+                  <div style={{background:"#fff",padding:"12px 16px",border:"1px solid #e5e7eb",borderTop:"none",borderBottomLeftRadius:10,borderBottomRightRadius:10}}>
+                    {item.desc&&<p style={{color:"#6b7280",fontSize:12,lineHeight:1.65,marginBottom:10,whiteSpace:"pre-line"}}>{item.desc}</p>}
+                    <div style={{display:"flex",gap:20}}>
+                      <span style={{fontSize:12,color:"#555"}}><strong>Qty:</strong> {isTrampoline?qty:`${qty} unit${qty!==1?"s":""}`}</span>
+                      <span style={{fontSize:12,color:"#555"}}><strong>Unit price:</strong> {fmt(unit)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
           {/* Totals */}
           <div style={{display:"flex",justifyContent:"flex-end",marginBottom:24}}>
             <table className="totals-table" style={{fontSize:13,borderCollapse:"collapse",minWidth:260}}>
@@ -266,17 +262,61 @@ function PrintView({q,onBack}){
             </table>
           </div>
           {q.notes&&<div style={{fontSize:12,color:"#555",borderTop:"1px solid #eee",paddingTop:12,marginBottom:16}}>{q.notes}</div>}
-          {/* Acorn Financing */}
+          {/* Financing */}
           {q.offer_financing!==false&&(
-            <a href={ACORN_URL} target="_blank" rel="noopener noreferrer" className="acorn-box" style={{display:"block",textDecoration:"none",border:"2px solid #0066cc",borderRadius:8,padding:"14px 18px",maxWidth:320,marginBottom:20}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <div style={{background:"#0066cc",borderRadius:"50%",width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontWeight:700,fontSize:12}}>A</span></div>
-                <span style={{fontWeight:700,fontSize:13,color:"#0066cc"}}>Acorn Finance</span>
+            <div style={{background:"#f5f8f0",border:"1px solid #c5d5b0",borderRadius:10,padding:"16px 18px",marginBottom:20}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#4a5c3a",marginBottom:12}}>Financing Options</div>
+              <div className="financing-options" style={{display:"flex",gap:10,marginBottom:12}}>
+                <div style={{flex:1,background:"#fff",borderRadius:8,padding:"12px",textAlign:"center",border:"1px solid #dde8cc"}}>
+                  <div style={{fontSize:20,fontWeight:700,color:"#4a5c3a"}}>{fmt(Math.ceil(tot(q)/6))}<span style={{fontSize:11,fontWeight:400,color:"#6b7280"}}>/mo</span></div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>for 6 months</div>
+                </div>
+                <div style={{flex:1,background:"#fff",borderRadius:8,padding:"12px",textAlign:"center",border:"1px solid #dde8cc"}}>
+                  <div style={{fontSize:20,fontWeight:700,color:"#4a5c3a"}}>{fmt(Math.ceil(tot(q)/12))}<span style={{fontSize:11,fontWeight:400,color:"#6b7280"}}>/mo</span></div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>for 12 months</div>
+                </div>
               </div>
-              <div style={{fontWeight:700,fontSize:12,color:"#0066cc",marginBottom:2}}>Pay for your project over time</div>
-              <div style={{fontSize:11,color:"#555"}}>✓ Checking your rate won't impact your credit score</div>
-              <div style={{marginTop:6,background:"#0066cc",color:"#fff",borderRadius:4,padding:"5px 12px",display:"inline-block",fontSize:11,fontWeight:600}}>Check My Rate →</div>
-            </a>
+              <div style={{background:"#eaf2e0",borderRadius:6,padding:"5px 10px",fontSize:11,color:"#4a5c3a",fontWeight:600,display:"inline-block",marginBottom:12}}>Same as cash — 0% interest, no fees</div>
+              <div>
+                <a href={ACORN_URL} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",background:"#4a5c3a",color:"#fff",textDecoration:"none",borderRadius:7,padding:"10px 20px",fontSize:13,fontWeight:700}}>Prequalify Instantly →</a>
+              </div>
+            </div>
+          )}
+          {/* Collapsible Scope of Work */}
+          {hasScope&&(
+            <div className="no-print" style={{marginBottom:20,borderTop:"1px solid #e5e7eb",paddingTop:16}}>
+              <button onClick={()=>setScopeOpen(o=>!o)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:"#4a5c3a",fontSize:13,fontWeight:700,padding:0,width:"100%",textAlign:"left"}}>
+                <span style={{fontSize:10,transition:"transform 0.2s",display:"inline-block",transform:scopeOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
+                <span>View Scope of Work</span>
+              </button>
+              {scopeOpen&&(
+                <div style={{marginTop:14,fontSize:12,color:"#444",lineHeight:1.7}}>
+                  {q.editScope&&q.customScope
+                    ?<div style={{whiteSpace:"pre-line"}}>{q.customScope}</div>
+                    :<div>
+                      {(()=>{
+                        const sections=[];
+                        if(cats.has("plaster"))sections.push(...PLASTER_SCOPE);
+                        if(cats.has("tile"))sections.push(...TILE_SCOPE);
+                        if(cats.has("coping"))sections.push(...COPING_SCOPE);
+                        if(sections.length>0)sections.push(...FINAL_SCOPE);
+                        return sections.map((s,i)=>(
+                          <div key={i} style={{marginBottom:14}}>
+                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>{s.title}</div>
+                            <ul style={{paddingLeft:18}}>{s.items.map((it,j)=><li key={j} style={{marginBottom:4}}>{it}</li>)}</ul>
+                          </div>
+                        ));
+                      })()}
+                      {hasTrampoline&&(
+                        <div style={{marginTop:8,padding:"10px 12px",background:"#f9fafb",borderRadius:6,border:"1px solid #e5e7eb",fontSize:11,color:"#555"}}>
+                          InGround Trampoline Installation Agreement is attached to the printed document.
+                        </div>
+                      )}
+                    </div>
+                  }
+                </div>
+              )}
+            </div>
           )}
           <div className="no-print" style={{display:"flex",gap:12,justifyContent:"center",marginTop:16}}>
             <button onClick={()=>window.print()} style={{background:"#4a5c3a",color:"#fff",border:"none",borderRadius:8,padding:"12px 32px",fontSize:14,fontWeight:700,cursor:"pointer"}}>Print / Save as PDF</button>
