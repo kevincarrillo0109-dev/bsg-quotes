@@ -271,24 +271,16 @@ function PrintView({q,onBack}){
             </table>
           </div>
           {q.notes&&<div style={{fontSize:12,color:"#555",borderTop:"1px solid #eee",paddingTop:12,marginBottom:16}}>{q.notes}</div>}
-          {/* Financing */}
+          {/* Acorn Financing */}
           {q.offer_financing!==false&&(
-            <div style={{background:"#f5f8f0",border:"1px solid #c5d5b0",borderRadius:10,padding:"16px 18px",marginBottom:20}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#4a5c3a",marginBottom:12}}>Financing Options</div>
-              <div className="financing-options" style={{display:"flex",gap:10,marginBottom:12}}>
-                <div style={{flex:1,background:"#fff",borderRadius:8,padding:"12px",textAlign:"center",border:"1px solid #dde8cc"}}>
-                  <div style={{fontSize:20,fontWeight:700,color:"#4a5c3a"}}>{fmt(Math.ceil(tot(q)/6))}<span style={{fontSize:11,fontWeight:400,color:"#6b7280"}}>/mo</span></div>
-                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>for 6 months</div>
-                </div>
-                <div style={{flex:1,background:"#fff",borderRadius:8,padding:"12px",textAlign:"center",border:"1px solid #dde8cc"}}>
-                  <div style={{fontSize:20,fontWeight:700,color:"#4a5c3a"}}>{fmt(Math.ceil(tot(q)/12))}<span style={{fontSize:11,fontWeight:400,color:"#6b7280"}}>/mo</span></div>
-                  <div style={{fontSize:11,color:"#6b7280",marginTop:2}}>for 12 months</div>
-                </div>
+            <div style={{border:"2px solid #4a5c3a",borderRadius:10,padding:"14px 18px",marginBottom:20}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <div style={{background:"#4a5c3a",borderRadius:"50%",width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{color:"#fff",fontWeight:700,fontSize:12}}>A</span></div>
+                <span style={{fontWeight:700,fontSize:14,color:"#4a5c3a"}}>Acorn Finance</span>
               </div>
-              <div style={{background:"#eaf2e0",borderRadius:6,padding:"5px 10px",fontSize:11,color:"#4a5c3a",fontWeight:600,display:"inline-block",marginBottom:12}}>Same as cash — 0% interest, no fees</div>
-              <div>
-                <a href={ACORN_URL} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",background:"#4a5c3a",color:"#fff",textDecoration:"none",borderRadius:7,padding:"10px 20px",fontSize:13,fontWeight:700}}>Prequalify Instantly →</a>
-              </div>
+              <div style={{fontWeight:700,fontSize:13,color:"#4a5c3a",marginBottom:4}}>Pay for your project over time</div>
+              <div style={{fontSize:12,color:"#6b7280",marginBottom:12}}>✓ Checking your rate won't impact your credit score</div>
+              <a href={ACORN_URL} target="_blank" rel="noopener noreferrer" style={{display:"inline-block",background:"#4a5c3a",color:"#fff",textDecoration:"none",borderRadius:6,padding:"9px 18px",fontSize:13,fontWeight:600}}>Check My Rate →</a>
             </div>
           )}
           {/* Collapsible Scope of Work */}
