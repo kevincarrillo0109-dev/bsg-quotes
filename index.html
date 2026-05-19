@@ -325,25 +325,6 @@ function PrintView({q,onBack}){
           </div>
         </div>
       </div>
-      {/* Custom scope override */}
-      {q.editScope&&q.customScope&&(
-        <div className="page-break">
-          <div style={{background:"#fff",padding:"48px 56px",position:"relative",fontFamily:"Georgia,serif",color:"#222",maxWidth:820,margin:"0 auto"}}>
-            <Watermark/><div style={{position:"relative",zIndex:1}}>
-            <div style={{textAlign:"center",marginBottom:20}}><Logo size={70}/></div>
-            <h1 style={{textAlign:"center",fontSize:22,fontWeight:700,marginBottom:24}}>Scope of Work</h1>
-            <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-line"}}>{q.customScope}</div></div>
-          </div>
-        </div>
-      )}
-      {/* Auto pool scope */}
-      {showPool&&(
-        <div className="page-break"><PoolScopePage cats={cats} q={q}/></div>
-      )}
-      {/* Trampoline agreement */}
-      {showTrampoline&&(
-        <div className="page-break"><TrampolineAgreementPage q={q}/></div>
-      )}
     </div>
   );
 }
