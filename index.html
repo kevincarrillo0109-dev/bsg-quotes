@@ -125,12 +125,13 @@ function getCats(items){
   return cats;
 }
 
-const eItem=()=>({id:Date.now()+Math.random(),productKey:"Add-On Service",itemName:"",desc:"",qty:1,unit:0,isFlat:false});
+const eItem=()=>({id:Date.now()+Math.random(),productKey:"Add-On Service",itemName:"",desc:"",qty:1,unit:0,total:0,isFlat:false});
 const eQuote=()=>({id:genId(),quoteNumber:genQN(),date:today(),client:"",address:"",deposit:"",items:[eItem()],discount:0,taxEnabled:false,status:"Draft",notes:"",editScope:false,customScope:"",offer_financing:true});
-const sub=q=>q.items.reduce((s,i)=>s+(Number(i.qty)||0)*(Number(i.unit)||0),0);
+const sub=q=>q.items.reduce((s,i)=>s+(Number(i.total)||0),0);
 const dsc=q=>sub(q)*(Number(q.discount)||0)/100;
 const tx=q=>q.taxEnabled?(sub(q)-dsc(q))*TAX:0;
 const tot=q=>sub(q)-dsc(q)+tx(q);
+const qtyUnit=cat=>cat==="plaster"?"sq. ft.":cat==="tile"||cat==="coping"?"ln. ft.":"";
 
 const lbl={display:"block",fontSize:11,color:"#8a9a7a",marginBottom:4,fontWeight:600,letterSpacing:1,textTransform:"uppercase"};
 const inp={width:"100%",background:BG,border:`1px solid #3a4832`,borderRadius:6,padding:"7px 10px",color:"#e5e7eb",fontSize:13,boxSizing:"border-box",outline:"none"};
@@ -239,19 +240,19 @@ function PrintView({q,onBack}){
             {q.items.map((item)=>{
               const qty=Number(item.qty)||0;
               const unit=Number(item.unit)||0;
-              const amt=qty*unit;
+              const total=Number(item.total)||0;
               const cat=PRODUCTS[item.productKey]?PRODUCTS[item.productKey].category:"other";
-              const isTrampoline=cat==="trampoline";
+              const unitLabel=qtyUnit(cat);
               return(
                 <div key={item.id} style={{borderRadius:10,overflow:"hidden",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.08)"}}>
                   <div style={{background:"#4a5c3a",padding:"11px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <span style={{color:"#fff",fontWeight:700,fontSize:14}}>{item.itemName||"—"}</span>
-                    <span style={{color:"#fff",fontWeight:700,fontSize:14,whiteSpace:"nowrap",marginLeft:12}}>{fmt(amt)}</span>
+                    <span style={{color:"#fff",fontWeight:700,fontSize:14,whiteSpace:"nowrap",marginLeft:12}}>{fmt(total)}</span>
                   </div>
                   <div style={{background:"#fff",padding:"12px 16px",border:"1px solid #e5e7eb",borderTop:"none",borderBottomLeftRadius:10,borderBottomRightRadius:10}}>
                     {item.desc&&<p style={{color:"#6b7280",fontSize:12,lineHeight:1.65,marginBottom:10,whiteSpace:"pre-line"}}>{item.desc}</p>}
                     <div style={{display:"flex",gap:20}}>
-                      <span style={{fontSize:12,color:"#555"}}><strong>Qty:</strong> {isTrampoline?qty:`${qty} unit${qty!==1?"s":""}`}</span>
+                      <span style={{fontSize:12,color:"#555"}}><strong>Qty:</strong> {qty}{unitLabel?" "+unitLabel:""}</span>
                       <span style={{fontSize:12,color:"#555"}}><strong>Unit price:</strong> {fmt(unit)}</span>
                     </div>
                   </div>
@@ -412,15 +413,16 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
                 </div>
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
                   <div style={{flex:1}}>
-                    <label style={lbl}>{isTrampoline?"Quantity":"Qty"}</label>
+                    <label style={lbl}>{"Qty"+(qtyUnit(cat)?" ("+qtyUnit(cat)+")":"")}</label>
                     <input type="number" value={item.qty} onChange={e=>setItem(item.id,"qty",e.target.value)} style={inp} min={0}/>
                   </div>
                   <div style={{flex:1}}>
                     <label style={lbl}>Unit Price ($)</label>
                     <input type="number" value={item.unit} onChange={e=>setItem(item.id,"unit",e.target.value)} style={inp} min={0} step="0.01"/>
                   </div>
-                  <div style={{flex:1,display:"flex",alignItems:"flex-end",paddingBottom:2}}>
-                    <div style={{fontSize:14,color:ORANGE_LIGHT,fontWeight:700}}>{fmt((Number(item.qty)||0)*(Number(item.unit)||0))}</div>
+                  <div style={{flex:1}}>
+                    <label style={lbl}>Total ($)</label>
+                    <input type="number" value={item.total||""} onChange={e=>setItem(item.id,"total",e.target.value)} style={inp} min={0} step="0.01"/>
                   </div>
                 </div>
                 <div>
