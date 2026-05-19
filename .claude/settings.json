@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/kevincarrillo/Downloads/JohnProject/BSG add .gitignore BSGlogo.png BSGtransparentlogo.png \"CircleLogo copy.png\" CircleLogo.png \"Gemini_Generated_Image_ocfmyzocfmyzocfm 2.JPEG\" HQLogo.png \"78554464397__BA213EC3-FEC7-4BDC-B365-9BB3A10349DF.HEIC\" IMG_0970.heic IMG_1463.HEIC IMG_1729.HEIC IMG_2398.jpg \"IMG_5747 2.PNG\" IMG_5777.heic IMG_6011.heic IMG_8205.HEIC \"Screenshot 2026-01-22 at 6.43.56 PM.png\" BSG-Finance/ BSGreel/ \"COI\\(insuranceCertificate\\)/\" Legal/ \"SignedContracts\\(Customer\\)/\")",
+      "Bash(git -C /Users/kevincarrillo/Downloads/JohnProject/BSG add --all -- ':!.DS_Store')",
+      "Bash(git -C /Users/kevincarrillo/Downloads/JohnProject/BSG status --short)",
+      "Bash(git -C /Users/kevincarrillo/Downloads/JohnProject/BSG add -A)"
+    ]
+  }
+}
