@@ -208,22 +208,20 @@ function PrintView({q,onBack}){
         <Watermark/>
         <div style={{position:"relative",zIndex:1}}>
           {/* Header */}
-          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:20}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:16}}>
             <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-              <div style={{width:60,height:60,borderRadius:"50%",overflow:"hidden",flexShrink:0}}>
-                <img src={LOGO_DATA} style={{width:60,height:60,objectFit:"cover"}}/>
-              </div>
+              <img src={LOGO_DATA} style={{width:64,height:64,borderRadius:"50%",objectFit:"cover",flexShrink:0}}/>
               <div style={{lineHeight:1.55}}>
                 <div style={{fontWeight:700,fontSize:15,color:"#222"}}>Backyard Solutions Group</div>
-                <div style={{fontSize:12,color:"#6b7280"}}>(972) 555-1234</div>
-                <div style={{fontSize:12,color:"#6b7280"}}>info@backyardsolutionsgroup.com</div>
+                <div style={{fontSize:12,color:"#6b7280"}}>(469) 972-5757</div>
+                <div style={{fontSize:12,color:"#6b7280"}}>contact@backyardsolutionsgroup.com</div>
               </div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:11,color:"#9ca3af",textTransform:"uppercase",letterSpacing:0.5}}>Quote #{q.quoteNumber}</div>
-              <div style={{fontWeight:700,fontSize:15,color:"#222",marginTop:2}}>{fmtDate(q.date)}</div>
+              <div style={{fontWeight:700,fontSize:15,color:"#222"}}>{fmtDate(q.date)}</div>
             </div>
           </div>
+          <div style={{height:3,background:"#4a5c3a",marginBottom:20}}></div>
           {q.deposit&&Number(q.deposit)>0&&(
             <div style={{marginBottom:14,padding:"10px 14px",background:"#f5f8f0",border:"1px solid #4a5c3a44",borderRadius:6,fontSize:13,fontWeight:600}}>
               A deposit of {fmt(q.deposit)} will be required to begin.
