@@ -54,6 +54,9 @@ const PRODUCTS={
   "Trampoline - 14' Round":{itemName:"Avyna InGround Trampoline w/ Pro-Installation 14' Round",desc:TRAMPOLINE_BASE_DESC("14' Round"),category:"trampoline"},
   "Trampoline - 12' Round":{itemName:"Avyna InGround Trampoline w/ Pro-Installation 12' Round",desc:TRAMPOLINE_BASE_DESC("12' Round"),category:"trampoline"},
   "Trampoline - Install Only":{itemName:"InGround Trampoline - Pro Installation Only",desc:"Professional in-ground trampoline installation. Includes: excavation, drainage system with weed barrier, gravel bed and sump pump.",category:"trampoline"},
+  "Trampoline - Unit":{itemName:"",desc:"",category:"trampoline"},
+  "Professional Installation":{itemName:"Professional Installation",desc:"Excavation to manufacturer specifications, site leveling, re-routing of up to two irrigation lines (if necessary), and weed barrier installation for long-term protection.",category:"trampoline",defaultPrice:3500},
+  "Drainage & Power Upgrade":{itemName:"Drainage & Power Upgrade",desc:"Automatic sump pump installation, approximately 800 lbs of drainage gravel for proper water flow, and electrical connection of the LED lighting system and pump to the nearest available power source.",category:"trampoline",defaultPrice:700},
 };
 
 const PRODUCT_GROUPS=[
@@ -61,7 +64,7 @@ const PRODUCT_GROUPS=[
   {label:"── Pool Interior ──",options:["Pool Interior - White Plaster","Pool Interior - Blue Quartz Aggregate","Pool Interior - Pebble Tech / Mini Pebble"]},
   {label:"── Tile ──",options:["Waterline Tile Replacement"]},
   {label:"── Coping ──",options:["Coping - Lueders Limestone","Coping - Oklahoma Stone","Coping - Travertine"]},
-  {label:"── InGround Trampoline ──",options:["Trampoline - 15'x15'","Trampoline - 12'x18'","Trampoline - 10'x17'","Trampoline - 10'x14'","Trampoline - 15' Round","Trampoline - 14' Round","Trampoline - 12' Round","Trampoline - Install Only"]},
+  {label:"── InGround Trampoline ──",options:["Trampoline - 15'x15'","Trampoline - 12'x18'","Trampoline - 10'x17'","Trampoline - 10'x14'","Trampoline - 15' Round","Trampoline - 14' Round","Trampoline - 12' Round","Trampoline - Install Only","Trampoline - Unit","Professional Installation","Drainage & Power Upgrade"]},
 ];
 
 // ─── Scope of Work Data ───────────────────────────────────
@@ -77,25 +80,6 @@ const COPING_SCOPE=[
 const FINAL_SCOPE=[
   {title:"Final Cleaning, Fill-Up & Inspection",items:["Clean surrounding work areas, rinse deck and coping.","Begin controlled pool refill upon curing of plaster.","Perform final quality inspection and walkthrough with client to confirm completion and satisfaction."]},
 ];
-const TRAMPOLINE_AGREEMENT=`Thank you for choosing us for your in-ground trampoline installation project. We are thrilled to be a part of creating a fun and engaging outdoor space for you and your family. Before commencing the work, we kindly request your permission and cooperation by reviewing and signing this agreement form.
-
-____ Permission to Work on Your Property: By signing this form, you grant Backyard Solutions Group and our team members permission to access your property at the specified address for the purpose of installing the in-ground trampoline in the designated area. This includes digging a 3'–5' hole. Rest assured, we will conduct our work with the utmost care and respect for your property.
-
-____ Timelines and Schedule: The installation process will be carried out on the agreed-upon date, and our team will make every effort to complete the project within the designated time frame. However, unforeseen circumstances such as weather conditions may influence the schedule, and we appreciate your understanding in such cases.
-
-____ Waiver of Liability: We prioritize a smooth and safe installation process, and although we exercise utmost care, it is important to note that our liability does NOT extend to broken utility lines, including water, electric, gas, communication, and sewer lines. To ensure the safety of your property, we kindly recommend that you contact 811, a free service managed by Underground Service Alert.
-
-1) Utility Lines: We want to be sure we don't install above any utility lines. If you are unsure, the city can do a complementary evaluation when you contact 811. They send a representative and mark any gas, water, sewer lines, etc.
-
-2) Outdoor Outlet: We run an extension cord up to 50' to the nearest outdoor outlet, so please let us know which outlet will be the designated outlet.
-
-3) Excavator Clearance: We use an excavator to dig the trampoline pit, requiring a minimum clearance of 3.5 feet in width. If sufficient clearance is unavailable, we can complete the project manually, which will incur an additional $500 charge and may extend the project by an extra day.
-
-4) Late Payment Policy: Payment for the project is due in full within 24 hours of installation completion. If payment is not received within this timeframe, a late fee of $100 per day will be applied to the outstanding balance.
-
-Please be aware that if we encounter solid surfaces such as concrete or rock during excavation, an additional fee of $500 will apply. Should you require us to haul away excess dirt, that service is available for an additional $500 per trip.
-
-The invoice is scheduled for payment on the day of installation upon project completion.`;
 
 const STATUSES=["Draft","Sent","Deposit Paid","Paid in Full","Overdue"];
 const SC={"Draft":"#8a9a7a","Sent":"#c9813a","Deposit Paid":"#d4a843","Paid in Full":"#6a8f5a","Overdue":"#c05a3a"};
@@ -172,25 +156,6 @@ function PoolScopePage({cats,q}){
   );
 }
 
-function TrampolineAgreementPage({q}){
-  return(
-    <div style={{background:"#fff",padding:"48px 56px",position:"relative",fontFamily:"Georgia,serif",color:"#222",maxWidth:820,margin:"0 auto"}}>
-      <Watermark/>
-      <div style={{position:"relative",zIndex:1}}>
-        <div style={{marginBottom:20}}><Logo size={70}/></div>
-        <h1 style={{textAlign:"center",fontSize:20,fontWeight:700,marginBottom:28}}>InGround Trampoline Installation Agreement</h1>
-        <div style={{fontSize:13,marginBottom:8}}><strong>Client Full Name:</strong> {q.client||"___________________________"}</div>
-        <div style={{fontSize:13,marginBottom:8}}><strong>Address:</strong> {q.address||"___________________________"}</div>
-        <div style={{fontSize:13,marginBottom:24}}><strong>Date of Installation:</strong> ___________________________</div>
-        <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-line"}}>{TRAMPOLINE_AGREEMENT}</div>
-        <div style={{marginTop:36,borderTop:"1px solid #ddd",paddingTop:20}}>
-          <div style={{fontSize:13,marginBottom:12}}><strong>Client Signature:</strong> ___________________________</div>
-          <div style={{fontSize:13}}><strong>Date:</strong> ___________________________</div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Print / Customer View ───────────────────────────────
 function PrintView({q,onBack}){
@@ -289,7 +254,7 @@ function PrintView({q,onBack}){
             <div className="no-print" style={{marginBottom:20,borderTop:"1px solid #e5e7eb",paddingTop:16}}>
               <button onClick={()=>setScopeOpen(o=>!o)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:"#4a5c3a",fontSize:13,fontWeight:700,padding:0,width:"100%",textAlign:"left"}}>
                 <span style={{fontSize:10,transition:"transform 0.2s",display:"inline-block",transform:scopeOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
-                <span>View Scope of Work</span>
+                <span>{hasTrampoline?"Important Information":"View Scope of Work"}</span>
               </button>
               {scopeOpen&&(
                 <div style={{marginTop:14,fontSize:12,color:"#444",lineHeight:1.7}}>
@@ -310,8 +275,21 @@ function PrintView({q,onBack}){
                         ));
                       })()}
                       {hasTrampoline&&(
-                        <div style={{marginTop:8,padding:"10px 12px",background:"#f9fafb",borderRadius:6,border:"1px solid #e5e7eb",fontSize:11,color:"#555"}}>
-                          InGround Trampoline Installation Agreement is attached to the printed document.
+                        <div style={{marginTop:8}}>
+                          <div style={{marginBottom:14}}>
+                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Two Ways to Buy</div>
+                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}>You can purchase your trampoline two ways. Both cost the same — the trampoline price is identical whether you order it yourself or have us handle it.</p>
+                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}><strong>Option 1 — We supply it (simplest):</strong> We order the trampoline for you and install it. You get one point of contact for the whole project, and your trampoline and installation are covered under a single warranty through us. We make sure the unit matches your site and drainage setup, coordinate delivery, and handle the unit if anything arrives damaged. Nothing for you to manage.</p>
+                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}><strong>Option 2 — You supply it:</strong> You purchase the trampoline yourself, and we install it. This works too — just note that a self-ordered unit needs to match the excavation and drainage specs, and your coverage is split between two companies: the manufacturer for the trampoline, and us for the installation. Either way, the trampoline price is the same.</p>
+                          </div>
+                          <div style={{marginBottom:14}}>
+                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>We Handle Utility Line Clearance (811)</div>
+                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Before any digging starts, we coordinate your 811 utility inspection for you. A team comes out to locate and mark any underground lines — electrical, gas, water, sewer, and internet — running through the dig area, so excavation happens safely with nothing damaged. It's a required step before any inground project, and we manage the entire process on your behalf. One less thing for you to schedule or worry about.</p>
+                          </div>
+                          <div>
+                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Drainage</div>
+                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Inground pits sit below grade, so they naturally collect rainwater. A proper drainage system is what keeps the trampoline usable year-round instead of sitting over standing water.</p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -346,7 +324,8 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
 
   const handleProduct=(id,productKey)=>{
     const prod=PRODUCTS[productKey]||PRODUCTS["Add-On Service"];
-    setQ(p=>({...p,items:p.items.map(i=>i.id===id?{...i,productKey,itemName:prod.itemName,desc:prod.desc}:i)}));
+    const priceFields=prod.defaultPrice!=null?{unit:prod.defaultPrice,total:prod.defaultPrice}:{};
+    setQ(p=>({...p,items:p.items.map(i=>i.id===id?{...i,productKey,itemName:prod.itemName,desc:prod.desc,...priceFields}:i)}));
   };
   const setItem=(id,k,v)=>setQ(p=>({...p,items:p.items.map(i=>i.id===id?{...i,[k]:v}:i)}));
   const addItem=()=>setQ(p=>({...p,items:[...p.items,eItem()]}));
@@ -448,7 +427,7 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
               ?<textarea value={q.customScope||""} onChange={e=>set("customScope",e.target.value)} placeholder="Type your custom scope or notes here..." style={{...inp,height:160,resize:"vertical"}}/>
               :<div style={{fontSize:12,color:"#6b7280",lineHeight:1.6}}>
                 {[hasPool?"Pool remodeling scope of work will auto-attach (Resurfacing → Tile → Coping + Final Inspection).":null,
-                  hasTrampoline?"InGround Trampoline Installation Agreement will auto-attach.":null]
+                  hasTrampoline?"Important information section will auto-attach.":null]
                   .filter(Boolean).join(" ")}
               </div>
             }
