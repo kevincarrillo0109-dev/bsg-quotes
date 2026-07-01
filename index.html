@@ -89,9 +89,9 @@ const TRAMPOLINE_BASE_DESC=(size)=>`${size} Avyna Bundle Package. ${size} InGrou
 
 const PRODUCTS={
   "Add-On Service":{itemName:"",desc:"",category:"other"},
-  "Pool Interior - White Plaster":{itemName:"Pool Interior",desc:"Drain and prep pool surface for resurfacing. Pressure washing, acid washing (if needed) to ensure proper bonding. Includes primer (bonding agent) application for adhesion.",category:"plaster"},
-  "Pool Interior - Blue Quartz Aggregate":{itemName:"Pool Interior",desc:"Drain and prep pool surface for resurfacing. Pressure washing, acid washing (if needed) to ensure proper bonding. Includes primer (bonding agent) application for adhesion.",category:"plaster"},
-  "Pool Interior - Pebble Tech / Mini Pebble":{itemName:"Pool Interior",desc:"Complete resurfacing of the pool interior using a mini-pebble plaster finish. Includes draining the pool, surface prep, bond coat (primer) application, installation of mini-pebble interior finish, acid wash, cleanup, and refill coordination. Provides improved durability, texture, and long-term performance compared to standard plaster.",category:"plaster"},
+  "Pool Interior - White Plaster":{itemName:"Pool Interior White Plaster",desc:"Drain and prep pool surface for resurfacing. Pressure washing, acid washing (if needed) to ensure proper bonding. Includes primer (bonding agent) application for adhesion.",category:"plaster",notes:"Approximate Surface Area:"},
+  "Pool Interior - Blue Quartz Aggregate":{itemName:"Pool Interior Blue Quartz Aggregates",desc:"Drain and prep pool surface for resurfacing. Pressure washing, acid washing (if needed) to ensure proper bonding. Includes primer (bonding agent) application for adhesion.",category:"plaster",notes:"Approximate Surface Area:"},
+  "Pool Interior - Pebble Tech / Mini Pebble":{itemName:"Pool Interior - Pebble Tech / Mini Pebble",desc:"Complete resurfacing of the pool interior using a mini-pebble plaster finish. Includes draining the pool, surface prep, bond coat (primer) application, installation of mini-pebble interior finish, acid wash, cleanup, and refill coordination. Provides improved durability, texture, and long-term performance compared to standard plaster.",category:"plaster",notes:"Approximate Surface Area:"},
   "Waterline Tile Replacement":{itemName:"Waterline Tile Replacement",desc:"Removal of existing tile and installation of new 6\"x6\" ceramic or porcelain tile. Includes removal of old tile, preparation, mortar setting, grouting, and sealant.",category:"tile"},
   "Coping - Lueders Limestone":{itemName:"Coping - Lueders Limestone",desc:"Removal of existing coping, and installation of new Lueders Limestone coping around pool perimeter.",category:"coping"},
   "Coping - Oklahoma Stone":{itemName:"Coping - Oklahoma Stone",desc:"Removal of existing coping, and installation of new Oklahoma Stone coping around pool perimeter.",category:"coping"},
@@ -374,7 +374,11 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
   const handleProduct=(id,productKey)=>{
     const prod=PRODUCTS[productKey]||PRODUCTS["Add-On Service"];
     const priceFields=prod.defaultPrice!=null?{unit:prod.defaultPrice,total:prod.defaultPrice}:{};
-    setQ(p=>({...p,items:p.items.map(i=>i.id===id?{...i,productKey,itemName:prod.itemName,desc:prod.desc,...priceFields}:i)}));
+    setQ(p=>({
+      ...p,
+      notes:prod.notes!=null?prod.notes:p.notes,
+      items:p.items.map(i=>i.id===id?{...i,productKey,itemName:prod.itemName,desc:prod.desc,...priceFields}:i)
+    }));
   };
   const setItem=(id,k,v)=>setQ(p=>({...p,items:p.items.map(i=>i.id===id?{...i,[k]:v}:i)}));
   const addItem=()=>setQ(p=>({...p,items:[...p.items,eItem()]}));
