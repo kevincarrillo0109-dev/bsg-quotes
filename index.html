@@ -544,6 +544,7 @@ function App(){
   React.useEffect(()=>{dbGetAll().then(rows=>{setQuotes(rows.map(r=>JSON.parse(r.data)));setLoading(false);});},[]);
 
   const saveQuote=async(q)=>{setSaveStatus("Saving...");const ok=await dbUpsert(q);if(ok){setQuotes(p=>p.find(x=>x.id===q.id)?p.map(x=>x.id===q.id?q:x):[q,...p]);setSaveStatus("Saved ✓");setTimeout(()=>setSaveStatus(""),2000);setView("dashboard");}else{setSaveStatus("Error — check connection");}};
+  const duplicateQuote=async(q)=>{const duplicate=JSON.parse(JSON.stringify(q));duplicate.id=genId();duplicate.quoteNumber=genQN();duplicate.status="Draft";duplicate.items=duplicate.items.map(i=>({...i,id:Date.now()+Math.random()}));const ok=await dbUpsert(duplicate);if(ok){setQuotes(p=>[duplicate,...p]);setView("dashboard");}};
   const deleteQuote=async(id)=>{await dbDelete(id);setQuotes(p=>p.filter(x=>x.id!==id));setView("dashboard");};
   const updateStatus=async(id,status)=>{const u=quotes.map(x=>x.id===id?{...x,status}:x);setQuotes(u);await dbUpsert(u.find(x=>x.id===id));};
   const getLink=q=>`${APP_URL}/?q=${q.id}`;
@@ -614,6 +615,7 @@ function App(){
                 <select value={q.status} onChange={e=>updateStatus(q.id,e.target.value)} style={{background:SC[q.status]+"22",color:SC[q.status],border:`1px solid ${SC[q.status]}44`,borderRadius:6,padding:"4px 8px",fontSize:12,cursor:"pointer",fontWeight:600}}>{STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select>
                 <button onClick={()=>window.open(getLink(q),"_blank")} style={{background:"#ffffff0d",border:"none",color:"#9ca3af",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Preview</button>
                 <button onClick={()=>setShareLink(getLink(q))} style={{background:OLIVE+"22",border:`1px solid ${OLIVE}44`,color:OLIVE_LIGHT,borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Share</button>
+                <button onClick={()=>duplicateQuote(q)} style={{background:OLIVE+"22",border:`1px solid ${OLIVE}44`,color:OLIVE_LIGHT,borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Duplicate</button>
                 <button onClick={()=>{setCurrent(q);setView("editor");}} style={{background:"#ffffff0d",border:"none",color:"#9ca3af",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Edit</button>
               </div>
             ))}
