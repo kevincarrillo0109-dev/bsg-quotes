@@ -133,7 +133,6 @@ const FINAL_SCOPE=[
 
 const STATUSES=["Draft","Sent","Deposit Paid","Paid in Full","Overdue"];
 const SC={"Draft":"#8a9a7a","Sent":"#c9813a","Deposit Paid":"#d4a843","Paid in Full":"#6a8f5a","Overdue":"#c05a3a"};
-const TAX=0.0825;
 
 // Brand colors
 const OLIVE="#4a5c3a";
@@ -160,10 +159,10 @@ function getCats(items){
 }
 
 const eItem=()=>({id:Date.now()+Math.random(),productKey:"Add-On Service",itemName:"",desc:"",qty:1,unit:0,total:0,isFlat:false});
-const eQuote=()=>({id:genId(),quoteNumber:genQN(),date:today(),client:"",address:"",deposit:"",items:[eItem()],discount:0,taxEnabled:false,status:"Draft",notes:"",editScope:false,customScope:"",offer_financing:true});
+const eQuote=()=>({id:genId(),quoteNumber:genQN(),date:today(),client:"",address:"",deposit:"",items:[eItem()],discount:0,taxEnabled:false,taxAmount:0,status:"Draft",notes:"",editScope:false,customScope:"",offer_financing:true});
 const sub=q=>q.items.reduce((s,i)=>s+(Number(i.total)||0),0);
 const dsc=q=>sub(q)*(Number(q.discount)||0)/100;
-const tx=q=>q.taxEnabled?(sub(q)-dsc(q))*TAX:0;
+const tx=q=>q.taxEnabled?Number(q.taxAmount)||0:0;
 const tot=q=>sub(q)-dsc(q)+tx(q);
 const qtyUnit=cat=>cat==="plaster"?"sq. ft.":cat==="tile"||cat==="coping"?"ln. ft.":"";
 
@@ -281,7 +280,7 @@ function PrintView({q,onBack}){
               <tbody>
                 <tr><td style={{padding:"4px 16px",color:"#555"}}>Subtotal</td><td style={{padding:"4px 16px",textAlign:"right"}}>{fmt(sub(q))}</td></tr>
                 {Number(q.discount)>0&&<tr><td style={{padding:"4px 16px",color:"#555"}}>Discount ({q.discount}%)</td><td style={{padding:"4px 16px",textAlign:"right",color:"#c96a2b"}}>-{fmt(dsc(q))}</td></tr>}
-                <tr><td style={{padding:"4px 16px",color:"#555"}}>Sales Tax:</td><td style={{padding:"4px 16px",textAlign:"right"}}>{fmt(tx(q))}</td></tr>
+                {q.taxEnabled&&<tr><td style={{padding:"4px 16px",color:"#555"}}>Tax:</td><td style={{padding:"4px 16px",textAlign:"right"}}>{fmt(tx(q))}</td></tr>}
                 <tr style={{background:"#f0f3ec"}}><td style={{padding:"8px 16px",fontWeight:700,fontSize:15}}>Total Amount:</td><td style={{padding:"8px 16px",fontWeight:700,fontSize:15,textAlign:"right",color:"#c96a2b"}}>{fmt(tot(q))}</td></tr>
               </tbody>
             </table>
@@ -486,14 +485,24 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
         {/* Totals */}
         <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
           <div style={secTitle}>Totals</div>
-          <div style={{display:"flex",gap:12,marginBottom:10}}>
+          <div style={{display:"flex",gap:12,marginBottom:10,alignItems:"flex-end"}}>
             <div style={{flex:1}}><label style={lbl}>Discount (%)</label><input type="number" value={q.discount} onChange={e=>set("discount",e.target.value)} style={inp} min={0} max={100}/></div>
-            <div style={{flex:1,display:"flex",alignItems:"flex-end",paddingBottom:2}}><label style={{...lbl,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}><input type="checkbox" checked={q.taxEnabled} onChange={e=>set("taxEnabled",e.target.checked)}/>Apply Tax (8.25%)</label></div>
+            <div style={{flex:1,display:"flex",alignItems:"flex-end",gap:8,paddingBottom:2}}>
+              <label style={{...lbl,cursor:"pointer",display:"flex",alignItems:"center",gap:6,marginBottom:0}}>
+                <input type="checkbox" checked={q.taxEnabled} onChange={e=>set("taxEnabled",e.target.checked)}/>Apply Tax
+              </label>
+              {q.taxEnabled&&(
+                <div style={{display:"flex",flexDirection:"column",minWidth:120}}>
+                  <label style={lbl}>Tax Amount ($)</label>
+                  <input type="number" value={q.taxAmount ?? ""} onChange={e=>set("taxAmount",e.target.value)} style={inp} min={0} step="0.01"/>
+                </div>
+              )}
+            </div>
           </div>
           <div style={{background:BG,borderRadius:8,padding:"14px 16px",display:"flex",flexDirection:"column",gap:6}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#e5e7eb"}}><span>Subtotal</span><span>{fmt(s)}</span></div>
             {Number(q.discount)>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:ORANGE}}><span>Discount ({q.discount}%)</span><span>-{fmt(d)}</span></div>}
-            {q.taxEnabled&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#e5e7eb"}}><span>Tax (8.25%)</span><span>{fmt(t)}</span></div>}
+            {q.taxEnabled&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#e5e7eb"}}><span>Tax</span><span>{fmt(t)}</span></div>}
             <div style={{borderTop:`1px solid #3a4832`,marginTop:4,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:700,color:ORANGE_LIGHT}}><span>Total</span><span>{fmt(total_)}</span></div>
           </div>
         </div>
