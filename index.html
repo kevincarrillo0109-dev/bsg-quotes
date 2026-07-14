@@ -85,6 +85,46 @@ async function dbGetOne(id){
   }
 }
 
+async function dbGetAllRates(){
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/subcontractor_rates?select=*&order=created_at.asc`,{headers:hdrs});
+    if(!r.ok){
+      const body = await r.text().catch(()=>'<unreadable body>');
+      console.error('dbGetAllRates fetch failed', r.status, body);
+      return [];
+    }
+    return r.json();
+  }catch(e){
+    console.error('dbGetAllRates exception', e);
+    return [];
+  }
+}
+async function dbUpsertRate(rt){
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/subcontractor_rates`,{method:"POST",headers:{...hdrs,"Prefer":"resolution=merge-duplicates"},body:JSON.stringify({id:rt.id,data:JSON.stringify(rt)})});
+    if(!r.ok){
+      const body = await r.text().catch(()=>'<unreadable body>');
+      console.error('dbUpsertRate fetch failed', r.status, body);
+      return false;
+    }
+    return r.ok;
+  }catch(e){
+    console.error('dbUpsertRate exception', e);
+    return false;
+  }
+}
+async function dbDeleteRate(id){
+  try{
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/subcontractor_rates?id=eq.${id}`,{method:"DELETE",headers:hdrs});
+    if(!r.ok){
+      const body = await r.text().catch(()=>'<unreadable body>');
+      console.error('dbDeleteRate fetch failed', r.status, body);
+    }
+  }catch(e){
+    console.error('dbDeleteRate exception', e);
+  }
+}
+
 const TRAMPOLINE_BASE_DESC=(size)=>`${size} Avyna Bundle Package. ${size} InGround Trampoline kit w/LED light kit and cover. Pro Install w/drainage system including weed barrier, gravel bed and sump pump.`;
 
 const PRODUCTS={
@@ -116,6 +156,54 @@ const PRODUCT_GROUPS=[
   {label:"── Coping ──",options:["Coping - Lueders Limestone","Coping - Oklahoma Stone","Coping - Travertine"]},
   {label:"── InGround Trampoline ──",options:["Trampoline - 15'x15'","Trampoline - 12'x18'","Trampoline - 10'x17'","Trampoline - 10'x14'","Trampoline - 15' Round","Trampoline - 14' Round","Trampoline - 12' Round","Trampoline - Install Only","Trampoline - Unit","Professional Installation","Drainage & Power Upgrade"]},
 ];
+
+// ─── Subcontractor Rate Table ──────────────────────────────
+const RATE_CATEGORIES=["plaster","coping","tile","other"];
+const RATE_CATEGORY_LABEL={plaster:"Plaster",coping:"Coping",tile:"Tile",other:"Other"};
+// Maps a rate's category+service to an existing PRODUCTS key so calculator-added
+// line items keep triggering the same scope-of-work sections as manually-picked products.
+const RATE_CATEGORY_PRODUCT_KEY={
+  plaster:{"Standard White":"Pool Interior - White Plaster","Blue Quartz Aggregate":"Pool Interior - Blue Quartz Aggregate","StoneScapes / Mini Pebble":"Pool Interior - Pebble Tech / Mini Pebble"},
+  coping:{"Lueders Limestone":"Coping - Lueders Limestone","Oklahoma Flagstone":"Coping - Oklahoma Stone","Travertine":"Coping - Travertine"},
+  tile:{"Waterline Tile (6\" standard)":"Waterline Tile Replacement"},
+  other:{},
+};
+function rateProductKey(category,service){return(RATE_CATEGORY_PRODUCT_KEY[category]&&RATE_CATEGORY_PRODUCT_KEY[category][service])||"Add-On Service";}
+function genRateId(){return`rate-${Date.now()}-${Math.floor(Math.random()*900+100)}`;}
+
+const DEFAULT_RATES=[
+  {id:"seed-plaster-standardwhite-alfonso-linft",category:"plaster",service:"Standard White",subcontractor:"Alfonso",unit:"linear ft",price:33.33},
+  {id:"seed-plaster-standardwhite-alfonso-sqft",category:"plaster",service:"Standard White",subcontractor:"Alfonso",unit:"sq ft",price:3.40},
+  {id:"seed-plaster-bluequartz-alfonso-linft",category:"plaster",service:"Blue Quartz Aggregate",subcontractor:"Alfonso",unit:"linear ft",price:41.90},
+  {id:"seed-plaster-bluequartz-alfonso-sqft",category:"plaster",service:"Blue Quartz Aggregate",subcontractor:"Alfonso",unit:"sq ft",price:4.27},
+  {id:"seed-plaster-stonescapes-alfonso-linft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"linear ft",price:86.92},
+  {id:"seed-plaster-stonescapes-alfonso-sqft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"sq ft",price:8.86},
+  {id:"seed-coping-lueders-alfonso",category:"coping",service:"Lueders Limestone",subcontractor:"Alfonso",unit:"linear ft",price:37.14},
+  {id:"seed-coping-lueders-javier",category:"coping",service:"Lueders Limestone",subcontractor:"Javier",unit:"linear ft",price:35.00},
+  {id:"seed-coping-oklahoma-alfonso",category:"coping",service:"Oklahoma Flagstone",subcontractor:"Alfonso",unit:"linear ft",price:37.14},
+  {id:"seed-coping-oklahoma-javier",category:"coping",service:"Oklahoma Flagstone",subcontractor:"Javier",unit:"linear ft",price:35.00},
+  {id:"seed-coping-travertine-javier",category:"coping",service:"Travertine",subcontractor:"Javier",unit:"linear ft",price:50.00},
+  {id:"seed-tile-waterline-alfonso",category:"tile",service:"Waterline Tile (6\" standard)",subcontractor:"Alfonso",unit:"linear ft",price:22.86},
+  {id:"seed-tile-waterline-javier",category:"tile",service:"Waterline Tile (6\" standard)",subcontractor:"Javier",unit:"linear ft",price:22.00},
+  {id:"seed-other-mastic-javier",category:"other",service:"Mastic Replacement",subcontractor:"Javier",unit:"linear ft",price:4.50},
+  {id:"seed-other-skimmer-alfonso",category:"other",service:"Skimmer Replacement",subcontractor:"Alfonso",unit:"each",price:1200.00},
+];
+
+// Surface Area ≈ Perimeter × (Average Depth × 0.9); Average Depth approximated as
+// 60% of the entered deepest-end depth (typical shallow/deep split). Flat-bottom
+// estimate is left at 0 since the result field is manually editable/overridable.
+function calcPlasterSurfaceArea(perimeter,deepestDepth){
+  const p=Number(perimeter)||0,d=Number(deepestDepth)||0;
+  const avgDepth=d*0.6;
+  return Math.round(p*(avgDepth*0.9)*100)/100;
+}
+function payoutRows(items){return(items||[]).filter(i=>i.subcontractorCost!=null&&i.subcontractorCost!=="");}
+function payoutSummary(q){
+  const rows=payoutRows(q.items);
+  const contractor=rows.reduce((s,i)=>s+(Number(i.subcontractorCost)||0),0);
+  const profit=rows.reduce((s,i)=>s+(Number(i.profitAmount)||0),0);
+  return{contractor,profit,has:rows.length>0};
+}
 
 // ─── Scope of Work Data ───────────────────────────────────
 const PLASTER_SCOPE=[
@@ -367,7 +455,7 @@ function ClientView({qid}){
 }
 
 // ─── Editor ──────────────────────────────────────────────
-function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
+function Editor({quote,onSave,onCancel,onDelete,saveStatus,onOpenCalculator}){
   const[q,setQ]=React.useState(quote);
   const set=(k,v)=>setQ(p=>({...p,[k]:v}));
 
@@ -400,6 +488,7 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             {saveStatus&&<span style={{fontSize:12,color:OLIVE_LIGHT}}>{saveStatus}</span>}
+            <button onClick={()=>onOpenCalculator(q)} style={btn(ORANGE)}>Pricing Calculator</button>
             <button onClick={onCancel} style={btn("#374151")}>Cancel</button>
             <button onClick={()=>onSave(q)} style={btn(OLIVE)}>Save</button>
           </div>
@@ -510,6 +599,8 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
             <div style={{borderTop:`1px solid #3a4832`,marginTop:4,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:700,color:ORANGE_LIGHT}}><span>Total</span><span>{fmt(total_)}</span></div>
           </div>
         </div>
+        {/* Payout Breakdown */}
+        <PayoutBreakdown items={q.items}/>
         {/* Notes */}
         <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
           <div style={secTitle}>Notes</div>
@@ -535,6 +626,334 @@ function Editor({quote,onSave,onCancel,onDelete,saveStatus}){
   );
 }
 
+// ─── Payout Breakdown (internal only, never rendered in PrintView/ClientView) ──
+function PayoutBreakdown({items}){
+  const rows=payoutRows(items);
+  if(rows.length===0)return null;
+  const bySubcontractor={};
+  let bsgProfit=0;
+  rows.forEach(i=>{
+    const name=i.subcontractorName||"Unknown";
+    bySubcontractor[name]=(bySubcontractor[name]||0)+(Number(i.subcontractorCost)||0);
+    bsgProfit+=Number(i.profitAmount)||0;
+  });
+  return(
+    <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${ORANGE}`}}>
+      <div style={secTitle}>Payout Breakdown (Internal Only)</div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead>
+            <tr style={{textAlign:"left",color:"#8a9a7a"}}>
+              <th style={{padding:"4px 8px"}}>Line Item</th><th style={{padding:"4px 8px"}}>Subcontractor</th><th style={{padding:"4px 8px"}}>Sub Cost</th><th style={{padding:"4px 8px"}}>Profit</th><th style={{padding:"4px 8px"}}>Client Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(i=>(
+              <tr key={i.id} style={{borderTop:"1px solid #3a4832"}}>
+                <td style={{padding:"6px 8px"}}>{i.itemName||"—"}</td>
+                <td style={{padding:"6px 8px"}}>{i.subcontractorName}</td>
+                <td style={{padding:"6px 8px"}}>{fmt(i.subcontractorCost)}</td>
+                <td style={{padding:"6px 8px"}}>{fmt(i.profitAmount)}</td>
+                <td style={{padding:"6px 8px"}}>{fmt(i.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            {Object.entries(bySubcontractor).map(([name,total])=>(
+              <tr key={name} style={{borderTop:"1px solid #3a4832"}}>
+                <td colSpan={2} style={{padding:"6px 8px",fontWeight:700}}>Total owed to {name}</td>
+                <td style={{padding:"6px 8px",fontWeight:700}}>{fmt(total)}</td><td></td><td></td>
+              </tr>
+            ))}
+            <tr style={{borderTop:"1px solid #3a4832"}}>
+              <td colSpan={3} style={{padding:"6px 8px",fontWeight:700,color:ORANGE_LIGHT}}>Total BSG Profit</td>
+              <td style={{padding:"6px 8px",fontWeight:700,color:ORANGE_LIGHT}}>{fmt(bsgProfit)}</td><td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Pricing Calculator ──────────────────────────────────
+function DimensionModal({category,initial,onCancel,onConfirm}){
+  const isPlaster=category==="plaster";
+  const[perimeter,setPerimeter]=React.useState(initial.perimeter||"");
+  const[depth,setDepth]=React.useState(initial.depth||"");
+  const[surfaceArea,setSurfaceArea]=React.useState(initial.surfaceArea||"");
+  const[touched,setTouched]=React.useState(false);
+
+  React.useEffect(()=>{
+    if(isPlaster&&!touched)setSurfaceArea(calcPlasterSurfaceArea(perimeter,depth)||"");
+  },[perimeter,depth]);
+
+  const canConfirm=isPlaster?Number(surfaceArea)>0:Number(perimeter)>0;
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"#000000aa",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onCancel}>
+      <div style={{background:CARD,borderRadius:12,padding:24,maxWidth:420,width:"90%"}} onClick={e=>e.stopPropagation()}>
+        <div style={{fontWeight:700,fontSize:15,marginBottom:14,color:"#fff"}}>{isPlaster?"Plaster Dimensions":"Perimeter"}</div>
+        <div style={{marginBottom:10}}>
+          <label style={lbl}>Perimeter (linear ft)</label>
+          <input type="number" value={perimeter} onChange={e=>setPerimeter(e.target.value)} style={inp} min={0}/>
+        </div>
+        {isPlaster&&<>
+          <div style={{marginBottom:10}}>
+            <label style={lbl}>Deepest End Depth (ft)</label>
+            <input type="number" value={depth} onChange={e=>setDepth(e.target.value)} style={inp} min={0}/>
+          </div>
+          <div style={{marginBottom:10}}>
+            <label style={lbl}>Approx. Surface Area (sq ft){touched&&<span style={{color:ORANGE_LIGHT,cursor:"pointer",textTransform:"none",fontWeight:400}} onClick={()=>setTouched(false)}> — reset to calculated</span>}</label>
+            <input type="number" value={surfaceArea} onChange={e=>{setSurfaceArea(e.target.value);setTouched(true);}} style={inp} min={0}/>
+          </div>
+        </>}
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:16}}>
+          <button onClick={onCancel} style={btn("#374151")}>Cancel</button>
+          <button disabled={!canConfirm} onClick={()=>onConfirm({perimeter:Number(perimeter)||0,depth:Number(depth)||0,surfaceArea:Number(surfaceArea)||0})} style={{...btn(OLIVE),opacity:canConfirm?1:0.5,cursor:canConfirm?"pointer":"not-allowed"}}>Continue</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RateAdminPanel({rates,onAdd,onUpdate,onDelete}){
+  const emptyForm={category:"plaster",service:"",subcontractor:"",unit:"linear ft",price:""};
+  const[form,setForm]=React.useState(emptyForm);
+  const[editingId,setEditingId]=React.useState(null);
+
+  const startEdit=r=>{setEditingId(r.id);setForm({category:r.category,service:r.service,subcontractor:r.subcontractor,unit:r.unit,price:r.price});};
+  const cancelEdit=()=>{setEditingId(null);setForm(emptyForm);};
+  const submit=()=>{
+    if(!form.service||!form.subcontractor||!form.price)return;
+    if(editingId)onUpdate({...form,id:editingId,price:Number(form.price)});
+    else onAdd({...form,id:genRateId(),price:Number(form.price)});
+    cancelEdit();
+  };
+
+  const sorted=[...rates].sort((a,b)=>a.category.localeCompare(b.category)||a.service.localeCompare(b.service)||a.subcontractor.localeCompare(b.subcontractor));
+
+  return(
+    <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
+      <div style={secTitle}>Subcontractor Rate Table</div>
+      <div style={{overflowX:"auto",marginBottom:14}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead>
+            <tr style={{textAlign:"left",color:"#8a9a7a"}}>
+              <th style={{padding:"4px 8px"}}>Category</th><th style={{padding:"4px 8px"}}>Service / Material</th><th style={{padding:"4px 8px"}}>Subcontractor</th><th style={{padding:"4px 8px"}}>Unit</th><th style={{padding:"4px 8px"}}>Price</th><th style={{padding:"4px 8px"}}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(r=>(
+              <tr key={r.id} style={{borderTop:"1px solid #3a4832"}}>
+                <td style={{padding:"6px 8px"}}>{RATE_CATEGORY_LABEL[r.category]||r.category}</td>
+                <td style={{padding:"6px 8px"}}>{r.service}</td>
+                <td style={{padding:"6px 8px"}}>{r.subcontractor}</td>
+                <td style={{padding:"6px 8px"}}>{r.unit}</td>
+                <td style={{padding:"6px 8px"}}>{fmt(r.price)}</td>
+                <td style={{padding:"6px 8px",whiteSpace:"nowrap"}}>
+                  <button onClick={()=>startEdit(r)} style={{background:"none",border:"none",color:"#9ca3af",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button>
+                  <button onClick={()=>{if(window.confirm("Delete this rate?"))onDelete(r.id);}} style={{background:"none",border:"none",color:"#c05a3a",cursor:"pointer",fontSize:12}}>Delete</button>
+                </td>
+              </tr>
+            ))}
+            {sorted.length===0&&<tr><td colSpan={6} style={{padding:"12px 8px",color:"#6b7280"}}>No rates yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
+        <div style={{minWidth:110}}>
+          <label style={lbl}>Category</label>
+          <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={inp}>
+            {RATE_CATEGORIES.map(c=><option key={c} value={c}>{RATE_CATEGORY_LABEL[c]}</option>)}
+          </select>
+        </div>
+        <div style={{flex:1,minWidth:140}}><label style={lbl}>Service / Material</label><input value={form.service} onChange={e=>setForm(f=>({...f,service:e.target.value}))} style={inp} placeholder="e.g. Standard White"/></div>
+        <div style={{minWidth:120}}><label style={lbl}>Subcontractor</label><input value={form.subcontractor} onChange={e=>setForm(f=>({...f,subcontractor:e.target.value}))} style={inp} placeholder="e.g. Alfonso"/></div>
+        <div style={{minWidth:110}}>
+          <label style={lbl}>Unit</label>
+          <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} style={inp}>
+            <option value="linear ft">linear ft</option>
+            <option value="sq ft">sq ft</option>
+            <option value="each">each</option>
+          </select>
+        </div>
+        <div style={{minWidth:100}}><label style={lbl}>Price ($)</label><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={inp} min={0} step="0.01"/></div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={submit} style={btn(OLIVE)}>{editingId?"Save":"+ Add Rate"}</button>
+          {editingId&&<button onClick={cancelEdit} style={btn("#374151")}>Cancel</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,onSelectTarget,onAddLineItem,onDone}){
+  const[category,setCategory]=React.useState("plaster");
+  const[dims,setDims]=React.useState({perimeter:0,depth:0,surfaceArea:0});
+  const[showDimModal,setShowDimModal]=React.useState(false);
+  const[material,setMaterial]=React.useState("");
+  const[rateId,setRateId]=React.useState("");
+  const[manualQty,setManualQty]=React.useState("");
+  const[profitType,setProfitType]=React.useState("percent");
+  const[profitValue,setProfitValue]=React.useState("");
+  const[addedMsg,setAddedMsg]=React.useState("");
+
+  const needsDims=category==="plaster"||category==="coping"||category==="tile";
+
+  const materials=React.useMemo(()=>{
+    const set=new Set(rates.filter(r=>r.category===category).map(r=>r.service));
+    return[...set];
+  },[rates,category]);
+
+  const matchingRates=rates.filter(r=>r.category===category&&r.service===material);
+  const selectedRate=rates.find(r=>r.id===rateId);
+
+  const quantity=(()=>{
+    if(!selectedRate)return 0;
+    if(selectedRate.unit==="sq ft")return Number(dims.surfaceArea)||0;
+    if(selectedRate.unit==="linear ft")return needsDims?(Number(dims.perimeter)||0):(Number(manualQty)||0);
+    return Number(manualQty)||0;
+  })();
+
+  const subCost=selectedRate?quantity*Number(selectedRate.price):0;
+  const profitAmount=profitType==="percent"?subCost*(Number(profitValue)||0)/100:(Number(profitValue)||0);
+  const clientTotal=subCost+profitAmount;
+  const unitPrice=quantity>0?clientTotal/quantity:0;
+
+  const resetSelection=nextCategory=>{
+    setCategory(nextCategory);
+    setDims({perimeter:0,depth:0,surfaceArea:0});
+    setMaterial("");
+    setRateId("");
+    setManualQty("");
+    setShowDimModal(nextCategory==="plaster"||nextCategory==="coping"||nextCategory==="tile");
+  };
+
+  const canAdd=!!(selectedRate&&quantity>0&&targetQuote);
+
+  const addToQuote=()=>{
+    if(!canAdd)return;
+    const label=category==="other"?material:`${RATE_CATEGORY_LABEL[category]} - ${material}`;
+    const unitLabel=selectedRate.unit;
+    const desc=category==="other"
+      ?`${material} — ${quantity} ${unitLabel}`
+      :`${RATE_CATEGORY_LABEL[category]} installation — ${material}, ${quantity} ${unitLabel}`;
+    const item={
+      id:Date.now()+Math.random(),
+      productKey:rateProductKey(category,material),
+      itemName:label,
+      desc,
+      qty:quantity,
+      unit:Math.round(unitPrice*100)/100,
+      total:Math.round(clientTotal*100)/100,
+      isFlat:false,
+      subcontractorName:selectedRate.subcontractor,
+      subcontractorCost:Math.round(subCost*100)/100,
+      profitAmount:Math.round(profitAmount*100)/100,
+      profitType,
+    };
+    onAddLineItem(item);
+    setAddedMsg(`Added "${label}" to ${targetQuote.quoteNumber}`);
+    setTimeout(()=>setAddedMsg(""),2500);
+    setMaterial("");setRateId("");setManualQty("");setProfitValue("");
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:BG,color:"#e5e7eb",fontFamily:"Georgia,serif",padding:"24px 16px"}}>
+      <div style={{maxWidth:800,margin:"0 auto"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+          <div style={{fontSize:18,fontWeight:700,color:"#e5e7eb"}}>Pricing Calculator</div>
+          <button onClick={onDone} style={btn("#374151")}>{targetQuote?"← Back to Editor":"← Back to Dashboard"}</button>
+        </div>
+
+        <RateAdminPanel rates={rates} onAdd={onAdd} onUpdate={onUpdate} onDelete={onDelete}/>
+
+        <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${ORANGE}`}}>
+          <div style={secTitle}>Add Line Item</div>
+
+          <div style={{marginBottom:12}}>
+            <label style={lbl}>Target Quote</label>
+            <select value={targetQuote?targetQuote.id:""} onChange={e=>onSelectTarget(quotes.find(q=>q.id===e.target.value)||null)} style={inp}>
+              <option value="">— Select a quote —</option>
+              {quotes.map(q=><option key={q.id} value={q.id}>{q.quoteNumber} — {q.client||"No Client"}</option>)}
+            </select>
+          </div>
+
+          <div style={{marginBottom:12}}>
+            <label style={lbl}>Service Category</label>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {RATE_CATEGORIES.map(c=>(
+                <button key={c} onClick={()=>resetSelection(c)} style={{padding:"6px 14px",borderRadius:20,fontSize:12,border:"none",cursor:"pointer",background:category===c?ORANGE:"#ffffff0d",color:category===c?"#fff":"#9ca3af",fontWeight:category===c?600:400}}>{RATE_CATEGORY_LABEL[c]}</button>
+              ))}
+            </div>
+          </div>
+
+          {needsDims&&(
+            <div style={{marginBottom:12,fontSize:12,color:"#9ca3af"}}>
+              {dims.perimeter||dims.surfaceArea
+                ?<div>Perimeter: {dims.perimeter} ln ft{category==="plaster"?` · Surface Area: ${dims.surfaceArea} sq ft`:""} <span style={{color:ORANGE_LIGHT,cursor:"pointer"}} onClick={()=>setShowDimModal(true)}>Edit</span></div>
+                :<button onClick={()=>setShowDimModal(true)} style={{background:"#ffffff0d",border:`1px dashed ${OLIVE}`,color:"#8a9a7a",borderRadius:6,padding:"6px 14px",cursor:"pointer",fontSize:12}}>Enter Dimensions</button>}
+            </div>
+          )}
+
+          <div style={{marginBottom:12}}>
+            <label style={lbl}>{category==="other"?"Service":"Material / Finish"}</label>
+            <select value={material} onChange={e=>{setMaterial(e.target.value);setRateId("");}} style={inp}>
+              <option value="">— Select —</option>
+              {materials.map(m=><option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+
+          {material&&(
+            <div style={{marginBottom:12}}>
+              <label style={lbl}>Subcontractor</label>
+              <select value={rateId} onChange={e=>setRateId(e.target.value)} style={inp}>
+                <option value="">— Select —</option>
+                {matchingRates.map(r=><option key={r.id} value={r.id}>{r.subcontractor} — {fmt(r.price)}/{r.unit}</option>)}
+              </select>
+            </div>
+          )}
+
+          {selectedRate&&(selectedRate.unit==="each"||!needsDims)&&(
+            <div style={{marginBottom:12}}>
+              <label style={lbl}>Quantity ({selectedRate.unit})</label>
+              <input type="number" value={manualQty} onChange={e=>setManualQty(e.target.value)} style={inp} min={0}/>
+            </div>
+          )}
+
+          {selectedRate&&(
+            <div style={{background:BG,borderRadius:8,padding:"14px 16px",marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}><span>Quantity</span><span>{quantity} {selectedRate.unit}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}><span>Subcontractor Cost</span><span>{fmt(subCost)}</span></div>
+              <div style={{marginBottom:6}}>
+                <label style={lbl}>Profit</label>
+                <div style={{display:"flex",gap:6}}>
+                  <select value={profitType} onChange={e=>setProfitType(e.target.value)} style={{...inp,width:110}}>
+                    <option value="percent">% Markup</option>
+                    <option value="flat">Flat $ Add</option>
+                  </select>
+                  <input type="number" value={profitValue} onChange={e=>setProfitValue(e.target.value)} style={inp} placeholder={profitType==="percent"?"e.g. 20":"e.g. 500"} min={0} step="0.01"/>
+                </div>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6,color:ORANGE_LIGHT}}><span>Profit Amount</span><span>{fmt(profitAmount)}</span></div>
+              <div style={{borderTop:"1px solid #3a4832",marginTop:4,paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:16,fontWeight:700,color:ORANGE_LIGHT}}><span>Client Price</span><span>{fmt(clientTotal)}</span></div>
+              <div style={{fontSize:11,color:"#6b7280",marginTop:4}}>{fmt(unitPrice)} / {selectedRate.unit}</div>
+            </div>
+          )}
+
+          {addedMsg&&<div style={{fontSize:12,color:OLIVE_LIGHT,marginBottom:10}}>{addedMsg}</div>}
+
+          <button disabled={!canAdd} onClick={addToQuote} style={{...btn(canAdd?ORANGE:"#374151"),opacity:canAdd?1:0.6,cursor:canAdd?"pointer":"not-allowed"}}>Add to Quote</button>
+          {!targetQuote&&<div style={{fontSize:11,color:"#c05a3a",marginTop:8}}>Select a target quote above to enable adding.</div>}
+        </div>
+
+        {showDimModal&&<DimensionModal category={category} initial={dims} onCancel={()=>setShowDimModal(false)} onConfirm={d=>{setDims(d);setShowDimModal(false);}}/>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard / App ─────────────────────────────────────
 function App(){
   const[quotes,setQuotes]=React.useState([]);
@@ -544,6 +963,7 @@ function App(){
   const[filter,setFilter]=React.useState("All");
   const[shareLink,setShareLink]=React.useState(null);
   const[saveStatus,setSaveStatus]=React.useState("");
+  const[rates,setRates]=React.useState([]);
 
   // Check for client-facing view via ?q= param
   const urlParams=new URLSearchParams(window.location.search);
@@ -555,6 +975,16 @@ function App(){
   if(hash.startsWith("quote/")){return<ClientView qid={hash.replace("quote/","")}/>;}
 
   React.useEffect(()=>{dbGetAll().then(rows=>{setQuotes(rows.map(r=>JSON.parse(r.data)));setLoading(false);});},[]);
+  React.useEffect(()=>{
+    dbGetAllRates().then(async rows=>{
+      if(rows.length===0){
+        await Promise.all(DEFAULT_RATES.map(dbUpsertRate));
+        setRates(DEFAULT_RATES);
+      }else{
+        setRates(rows.map(r=>JSON.parse(r.data)));
+      }
+    });
+  },[]);
 
   const saveQuote=async(q)=>{setSaveStatus("Saving...");const ok=await dbUpsert(q);if(ok){setQuotes(p=>p.find(x=>x.id===q.id)?p.map(x=>x.id===q.id?q:x):[q,...p]);setSaveStatus("Saved ✓");setTimeout(()=>setSaveStatus(""),2000);setView("dashboard");}else{setSaveStatus("Error — check connection");}};
   const duplicateQuote=async(q)=>{const duplicate=JSON.parse(JSON.stringify(q));duplicate.id=genId();duplicate.quoteNumber=genQN();duplicate.status="Draft";duplicate.items=duplicate.items.map(i=>({...i,id:Date.now()+Math.random()}));const ok=await dbUpsert(duplicate);if(ok){setQuotes(p=>[duplicate,...p]);setView("dashboard");}};
@@ -562,13 +992,20 @@ function App(){
   const updateStatus=async(id,status)=>{const u=quotes.map(x=>x.id===id?{...x,status}:x);setQuotes(u);await dbUpsert(u.find(x=>x.id===id));};
   const getLink=q=>`${APP_URL}/?q=${q.id}`;
 
+  const addRate=async(rt)=>{const ok=await dbUpsertRate(rt);if(ok)setRates(p=>[...p,rt]);};
+  const updateRate=async(rt)=>{const ok=await dbUpsertRate(rt);if(ok)setRates(p=>p.map(r=>r.id===rt.id?rt:r));};
+  const deleteRate=async(id)=>{await dbDeleteRate(id);setRates(p=>p.filter(r=>r.id!==id));};
+  const openCalculator=q=>{setCurrent(q);setView("calculator");};
+  const addLineItemToCurrent=item=>setCurrent(p=>p?{...p,items:[...p.items,item]}:p);
+
   const filtered=filter==="All"?quotes:quotes.filter(q=>q.status===filter);
   const totalOwed=quotes.filter(q=>!["Paid in Full","Draft"].includes(q.status)).reduce((s,q)=>s+tot(q),0);
   const totalCollected=quotes.filter(q=>q.status==="Paid in Full").reduce((s,q)=>s+tot(q),0);
   const totalDeposit=quotes.filter(q=>q.status==="Deposit Paid").reduce((s,q)=>s+tot(q),0);
 
-  if(view==="editor")return<Editor quote={current} onSave={saveQuote} onCancel={()=>setView("dashboard")} onDelete={deleteQuote} saveStatus={saveStatus}/>;
+  if(view==="editor")return<Editor quote={current} onSave={saveQuote} onCancel={()=>setView("dashboard")} onDelete={deleteQuote} saveStatus={saveStatus} onOpenCalculator={openCalculator}/>;
   if(view==="preview")return<PrintView q={current} onBack={()=>setView("dashboard")}/>;
+  if(view==="calculator")return<PricingCalculatorTab rates={rates} onAdd={addRate} onUpdate={updateRate} onDelete={deleteRate} quotes={quotes} targetQuote={current} onSelectTarget={setCurrent} onAddLineItem={addLineItemToCurrent} onDone={()=>setView(current?"editor":"dashboard")}/>;
 
   return(
     <div style={{minHeight:"100vh",background:BG,color:"#e5e7eb",fontFamily:"Georgia,serif",padding:"24px 16px"}}>
@@ -582,7 +1019,10 @@ function App(){
               <div style={{fontSize:11,color:"#8a9a7a",letterSpacing:2,textTransform:"uppercase"}}>Quote Management</div>
             </div>
           </div>
-          <button onClick={()=>{setCurrent(eQuote());setView("editor");}} style={{...btn(ORANGE),letterSpacing:0.5}}>+ New Quote</button>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setView("calculator")} style={{...btn("#ffffff0d","#9ca3af"),border:`1px solid ${OLIVE}66`}}>Pricing Calculator</button>
+            <button onClick={()=>{setCurrent(eQuote());setView("editor");}} style={{...btn(ORANGE),letterSpacing:0.5}}>+ New Quote</button>
+          </div>
         </div>
         {/* Summary Cards */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:24}}>
@@ -618,20 +1058,26 @@ function App(){
           <div style={{textAlign:"center",color:"#4b5563",padding:"60px 0",fontSize:14}}>No quotes yet. Hit + New Quote to start.</div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {filtered.map(q=>(
-              <div key={q.id} style={{background:CARD,borderRadius:10,padding:"14px 16px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderLeft:`2px solid ${SC[q.status]||"#374151"}`}}>
-                <div style={{flex:1,minWidth:160}}>
-                  <div style={{fontWeight:600,fontSize:14,color:"#fff"}}>{q.client||"No Client"}</div>
-                  <div style={{fontSize:11,color:"#6b7280"}}>{q.quoteNumber} · {q.date}</div>
+            {filtered.map(q=>{
+              const payout=payoutSummary(q);
+              return(
+              <div key={q.id} style={{background:CARD,borderRadius:10,padding:"14px 16px",borderLeft:`2px solid ${SC[q.status]||"#374151"}`}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:160}}>
+                    <div style={{fontWeight:600,fontSize:14,color:"#fff"}}>{q.client||"No Client"}</div>
+                    <div style={{fontSize:11,color:"#6b7280"}}>{q.quoteNumber} · {q.date}</div>
+                  </div>
+                  <div style={{fontSize:15,fontWeight:700,color:ORANGE_LIGHT,minWidth:90,textAlign:"right"}}>{fmt(tot(q))}</div>
+                  <select value={q.status} onChange={e=>updateStatus(q.id,e.target.value)} style={{background:SC[q.status]+"22",color:SC[q.status],border:`1px solid ${SC[q.status]}44`,borderRadius:6,padding:"4px 8px",fontSize:12,cursor:"pointer",fontWeight:600}}>{STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select>
+                  <button onClick={()=>window.open(getLink(q),"_blank")} style={{background:"#ffffff0d",border:"none",color:"#9ca3af",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Preview</button>
+                  <button onClick={()=>setShareLink(getLink(q))} style={{background:OLIVE+"22",border:`1px solid ${OLIVE}44`,color:OLIVE_LIGHT,borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Share</button>
+                  <button onClick={()=>duplicateQuote(q)} style={{background:OLIVE+"22",border:`1px solid ${OLIVE}44`,color:OLIVE_LIGHT,borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Duplicate</button>
+                  <button onClick={()=>{setCurrent(q);setView("editor");}} style={{background:"#ffffff0d",border:"none",color:"#9ca3af",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Edit</button>
                 </div>
-                <div style={{fontSize:15,fontWeight:700,color:ORANGE_LIGHT,minWidth:90,textAlign:"right"}}>{fmt(tot(q))}</div>
-                <select value={q.status} onChange={e=>updateStatus(q.id,e.target.value)} style={{background:SC[q.status]+"22",color:SC[q.status],border:`1px solid ${SC[q.status]}44`,borderRadius:6,padding:"4px 8px",fontSize:12,cursor:"pointer",fontWeight:600}}>{STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select>
-                <button onClick={()=>window.open(getLink(q),"_blank")} style={{background:"#ffffff0d",border:"none",color:"#9ca3af",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Preview</button>
-                <button onClick={()=>setShareLink(getLink(q))} style={{background:OLIVE+"22",border:`1px solid ${OLIVE}44`,color:OLIVE_LIGHT,borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Share</button>
-                <button onClick={()=>duplicateQuote(q)} style={{background:OLIVE+"22",border:`1px solid ${OLIVE}44`,color:OLIVE_LIGHT,borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Duplicate</button>
-                <button onClick={()=>{setCurrent(q);setView("editor");}} style={{background:"#ffffff0d",border:"none",color:"#9ca3af",borderRadius:6,padding:"5px 10px",cursor:"pointer",fontSize:12}}>Edit</button>
+                {payout.has&&<div style={{fontSize:11,color:"#6b7280",marginTop:8,paddingTop:8,borderTop:"1px solid #3a483233"}}>Contractor: {fmt(payout.contractor)} total · Profit: {fmt(payout.profit)} total</div>}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
