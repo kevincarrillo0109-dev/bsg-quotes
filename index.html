@@ -158,7 +158,6 @@ const PRODUCT_GROUPS=[
 ];
 
 // ─── Subcontractor Rate Table ──────────────────────────────
-const RATE_CATEGORIES=["plaster","coping","tile","other"];
 const RATE_CATEGORY_LABEL={plaster:"Plaster",coping:"Coping",tile:"Tile",other:"Other"};
 // Maps a rate's category+service to an existing PRODUCTS key so calculator-added
 // line items keep triggering the same scope-of-work sections as manually-picked products.
@@ -717,21 +716,30 @@ function DimensionModal({category,initial,onCancel,onConfirm}){
   );
 }
 
+const NEW_SERVICE_OPT="__new_service__";
+function rateTypeLabel(unit){return unit==="sq ft"?"Per Sq.Ft.":unit==="linear ft"?"Per Ln.Ft.":"Per Each";}
 function RateAdminPanel({rates,onAdd,onUpdate,onDelete}){
-  const emptyForm={category:"plaster",service:"",subcontractor:"",unit:"linear ft",price:""};
+  const emptyForm={service:"",newService:"",subcontractor:"",unit:"sq ft",price:"",isPinned:false};
   const[form,setForm]=React.useState(emptyForm);
   const[editingId,setEditingId]=React.useState(null);
 
-  const startEdit=r=>{setEditingId(r.id);setForm({category:r.category,service:r.service,subcontractor:r.subcontractor,unit:r.unit,price:r.price});};
+  const distinctServices=React.useMemo(()=>[...new Set(rates.map(r=>r.service))].sort(),[rates]);
+  const serviceForCategory=svc=>{const existing=rates.find(r=>r.service===svc);return existing?existing.category:"other";};
+
+  const startEdit=r=>{setEditingId(r.id);setForm({service:r.service,newService:"",subcontractor:r.subcontractor,unit:r.unit,price:r.price,isPinned:!!r.isPinned});};
   const cancelEdit=()=>{setEditingId(null);setForm(emptyForm);};
   const submit=()=>{
-    if(!form.service||!form.subcontractor||!form.price)return;
-    if(editingId)onUpdate({...form,id:editingId,price:Number(form.price)});
-    else onAdd({...form,id:genRateId(),price:Number(form.price)});
+    const effectiveService=form.service===NEW_SERVICE_OPT?form.newService.trim():form.service;
+    if(!effectiveService||!form.subcontractor||!form.price)return;
+    const rt={id:editingId||genRateId(),category:serviceForCategory(effectiveService),service:effectiveService,subcontractor:form.subcontractor,unit:form.unit,price:Number(form.price),isPinned:form.isPinned};
+    if(rt.isPinned){
+      rates.filter(r=>r.service===effectiveService&&r.id!==rt.id&&r.isPinned).forEach(r=>onUpdate({...r,isPinned:false}));
+    }
+    if(editingId)onUpdate(rt);else onAdd(rt);
     cancelEdit();
   };
 
-  const sorted=[...rates].sort((a,b)=>a.category.localeCompare(b.category)||a.service.localeCompare(b.service)||a.subcontractor.localeCompare(b.subcontractor));
+  const sorted=[...rates].sort((a,b)=>a.service.localeCompare(b.service)||a.subcontractor.localeCompare(b.subcontractor));
 
   return(
     <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
@@ -740,16 +748,15 @@ function RateAdminPanel({rates,onAdd,onUpdate,onDelete}){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
           <thead>
             <tr style={{textAlign:"left",color:"#8a9a7a"}}>
-              <th style={{padding:"4px 8px"}}>Category</th><th style={{padding:"4px 8px"}}>Service / Material</th><th style={{padding:"4px 8px"}}>Subcontractor</th><th style={{padding:"4px 8px"}}>Unit</th><th style={{padding:"4px 8px"}}>Price</th><th style={{padding:"4px 8px"}}></th>
+              <th style={{padding:"4px 8px"}}>Service</th><th style={{padding:"4px 8px"}}>Contractor</th><th style={{padding:"4px 8px"}}>Rate Type</th><th style={{padding:"4px 8px"}}>Rate ($)</th><th style={{padding:"4px 8px"}}></th>
             </tr>
           </thead>
           <tbody>
             {sorted.map(r=>(
               <tr key={r.id} style={{borderTop:"1px solid #3a4832"}}>
-                <td style={{padding:"6px 8px"}}>{RATE_CATEGORY_LABEL[r.category]||r.category}</td>
                 <td style={{padding:"6px 8px"}}>{r.service}</td>
-                <td style={{padding:"6px 8px"}}>{r.subcontractor}</td>
-                <td style={{padding:"6px 8px"}}>{r.unit}</td>
+                <td style={{padding:"6px 8px"}}>{r.isPinned&&<span title="Pinned default contractor" style={{color:ORANGE_LIGHT,marginRight:4}}>★</span>}{r.subcontractor}</td>
+                <td style={{padding:"6px 8px"}}>{rateTypeLabel(r.unit)}</td>
                 <td style={{padding:"6px 8px"}}>{fmt(r.price)}</td>
                 <td style={{padding:"6px 8px",whiteSpace:"nowrap"}}>
                   <button onClick={()=>startEdit(r)} style={{background:"none",border:"none",color:"#9ca3af",cursor:"pointer",fontSize:12,marginRight:8}}>Edit</button>
@@ -757,28 +764,36 @@ function RateAdminPanel({rates,onAdd,onUpdate,onDelete}){
                 </td>
               </tr>
             ))}
-            {sorted.length===0&&<tr><td colSpan={6} style={{padding:"12px 8px",color:"#6b7280"}}>No rates yet.</td></tr>}
+            {sorted.length===0&&<tr><td colSpan={5} style={{padding:"12px 8px",color:"#6b7280"}}>No rates yet.</td></tr>}
           </tbody>
         </table>
       </div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"flex-end"}}>
-        <div style={{minWidth:110}}>
-          <label style={lbl}>Category</label>
-          <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={inp}>
-            {RATE_CATEGORIES.map(c=><option key={c} value={c}>{RATE_CATEGORY_LABEL[c]}</option>)}
+        <div style={{flex:1,minWidth:160}}>
+          <label style={lbl}>Service</label>
+          <select value={form.service} onChange={e=>setForm(f=>({...f,service:e.target.value,newService:""}))} style={inp}>
+            <option value="">— Select —</option>
+            {distinctServices.map(s=><option key={s} value={s}>{s}</option>)}
+            <option value={NEW_SERVICE_OPT}>+ Add New Service</option>
           </select>
+          {form.service===NEW_SERVICE_OPT&&<input value={form.newService} onChange={e=>setForm(f=>({...f,newService:e.target.value}))} style={{...inp,marginTop:6}} placeholder="New service name"/>}
         </div>
-        <div style={{flex:1,minWidth:140}}><label style={lbl}>Service / Material</label><input value={form.service} onChange={e=>setForm(f=>({...f,service:e.target.value}))} style={inp} placeholder="e.g. Standard White"/></div>
-        <div style={{minWidth:120}}><label style={lbl}>Subcontractor</label><input value={form.subcontractor} onChange={e=>setForm(f=>({...f,subcontractor:e.target.value}))} style={inp} placeholder="e.g. Alfonso"/></div>
-        <div style={{minWidth:110}}>
-          <label style={lbl}>Unit</label>
+        <div style={{minWidth:120}}><label style={lbl}>Contractor Name</label><input value={form.subcontractor} onChange={e=>setForm(f=>({...f,subcontractor:e.target.value}))} style={inp} placeholder="e.g. Alfonso"/></div>
+        <div style={{minWidth:120}}>
+          <label style={lbl}>Rate Type</label>
           <select value={form.unit} onChange={e=>setForm(f=>({...f,unit:e.target.value}))} style={inp}>
-            <option value="linear ft">linear ft</option>
-            <option value="sq ft">sq ft</option>
-            <option value="each">each</option>
+            <option value="sq ft">Per Sq.Ft.</option>
+            <option value="linear ft">Per Ln.Ft.</option>
+            {form.unit==="each"&&<option value="each">Per Each (legacy)</option>}
           </select>
         </div>
-        <div style={{minWidth:100}}><label style={lbl}>Price ($)</label><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={inp} min={0} step="0.01"/></div>
+        <div style={{minWidth:100}}><label style={lbl}>Rate Amount ($)</label><input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} style={inp} min={0} step="0.01"/></div>
+        <div style={{minWidth:170,paddingBottom:7}}>
+          <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#9ca3af",cursor:"pointer"}}>
+            <input type="checkbox" checked={form.isPinned} onChange={e=>setForm(f=>({...f,isPinned:e.target.checked}))}/>
+            Pin as default contractor
+          </label>
+        </div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={submit} style={btn(OLIVE)}>{editingId?"Save":"+ Add Rate"}</button>
           {editingId&&<button onClick={cancelEdit} style={btn("#374151")}>Cancel</button>}
@@ -788,25 +803,21 @@ function RateAdminPanel({rates,onAdd,onUpdate,onDelete}){
   );
 }
 
-function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,onSelectTarget,onAddLineItem,onDone}){
-  const[category,setCategory]=React.useState("plaster");
+function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,onSelectTarget,onAddLineItem,onCreateQuoteFromCart,onDone}){
+  const[service,setService]=React.useState("");
   const[dims,setDims]=React.useState({perimeter:0,depth:0,surfaceArea:0});
   const[showDimModal,setShowDimModal]=React.useState(false);
-  const[material,setMaterial]=React.useState("");
   const[rateId,setRateId]=React.useState("");
   const[manualQty,setManualQty]=React.useState("");
   const[profitType,setProfitType]=React.useState("percent");
   const[profitValue,setProfitValue]=React.useState("");
   const[addedMsg,setAddedMsg]=React.useState("");
+  const[cart,setCart]=React.useState([]);
 
+  const serviceOptions=React.useMemo(()=>[...new Set(rates.map(r=>r.service))].sort(),[rates]);
+  const matchingRates=rates.filter(r=>r.service===service);
+  const category=matchingRates[0]?matchingRates[0].category:"other";
   const needsDims=category==="plaster"||category==="coping"||category==="tile";
-
-  const materials=React.useMemo(()=>{
-    const set=new Set(rates.filter(r=>r.category===category).map(r=>r.service));
-    return[...set];
-  },[rates,category]);
-
-  const matchingRates=rates.filter(r=>r.category===category&&r.service===material);
   const selectedRate=rates.find(r=>r.id===rateId);
 
   const quantity=(()=>{
@@ -821,27 +832,32 @@ function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,
   const clientTotal=subCost+profitAmount;
   const unitPrice=quantity>0?clientTotal/quantity:0;
 
-  const resetSelection=nextCategory=>{
-    setCategory(nextCategory);
-    setDims({perimeter:0,depth:0,surfaceArea:0});
-    setMaterial("");
+  const selectService=svc=>{
+    setService(svc);
     setRateId("");
     setManualQty("");
-    setShowDimModal(nextCategory==="plaster"||nextCategory==="coping"||nextCategory==="tile");
+    const rowsForSvc=rates.filter(r=>r.service===svc);
+    const cat=rowsForSvc[0]?rowsForSvc[0].category:"other";
+    const needsD=cat==="plaster"||cat==="coping"||cat==="tile";
+    setShowDimModal(needsD);
+    const pinned=rowsForSvc.find(r=>r.isPinned);
+    if(pinned)setRateId(pinned.id);
+    else if(rowsForSvc.length===1)setRateId(rowsForSvc[0].id);
   };
 
-  const canAdd=!!(selectedRate&&quantity>0&&targetQuote);
+  const canBuild=!!(selectedRate&&quantity>0);
+  const canAddToQuote=canBuild&&!!targetQuote;
 
-  const addToQuote=()=>{
-    if(!canAdd)return;
-    const label=category==="other"?material:`${RATE_CATEGORY_LABEL[category]} - ${material}`;
+  const buildItem=()=>{
+    if(!canBuild)return null;
+    const label=category==="other"?service:`${RATE_CATEGORY_LABEL[category]} - ${service}`;
     const unitLabel=selectedRate.unit;
     const desc=category==="other"
-      ?`${material} — ${quantity} ${unitLabel}`
-      :`${RATE_CATEGORY_LABEL[category]} installation — ${material}, ${quantity} ${unitLabel}`;
-    const item={
+      ?`${service} — ${quantity} ${unitLabel}`
+      :`${RATE_CATEGORY_LABEL[category]} installation — ${service}, ${quantity} ${unitLabel}`;
+    return{
       id:Date.now()+Math.random(),
-      productKey:rateProductKey(category,material),
+      productKey:rateProductKey(category,service),
       itemName:label,
       desc,
       qty:quantity,
@@ -853,10 +869,36 @@ function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,
       profitAmount:Math.round(profitAmount*100)/100,
       profitType,
     };
+  };
+
+  const clearItemInputs=()=>{setService("");setRateId("");setManualQty("");setProfitValue("");};
+
+  const addToQuote=()=>{
+    const item=buildItem();
+    if(!item)return;
     onAddLineItem(item);
-    setAddedMsg(`Added "${label}" to ${targetQuote.quoteNumber}`);
+    setAddedMsg(`Added "${item.itemName}" to ${targetQuote.quoteNumber}`);
     setTimeout(()=>setAddedMsg(""),2500);
-    setMaterial("");setRateId("");setManualQty("");setProfitValue("");
+    clearItemInputs();
+  };
+
+  const addItemToCart=()=>{
+    const item=buildItem();
+    if(!item)return;
+    setCart(p=>[...p,item]);
+    setAddedMsg(`Added "${item.itemName}" to cart`);
+    setTimeout(()=>setAddedMsg(""),2500);
+    clearItemInputs();
+  };
+
+  const removeFromCart=id=>setCart(p=>p.filter(i=>i.id!==id));
+
+  const cartTotal=cart.reduce((s,i)=>s+(Number(i.total)||0),0);
+
+  const createQuoteFromCart=()=>{
+    if(cart.length===0)return;
+    onCreateQuoteFromCart(cart);
+    setCart([]);
   };
 
   return(
@@ -881,12 +923,11 @@ function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,
           </div>
 
           <div style={{marginBottom:12}}>
-            <label style={lbl}>Service Category</label>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {RATE_CATEGORIES.map(c=>(
-                <button key={c} onClick={()=>resetSelection(c)} style={{padding:"6px 14px",borderRadius:20,fontSize:12,border:"none",cursor:"pointer",background:category===c?ORANGE:"#ffffff0d",color:category===c?"#fff":"#9ca3af",fontWeight:category===c?600:400}}>{RATE_CATEGORY_LABEL[c]}</button>
-              ))}
-            </div>
+            <label style={lbl}>Service</label>
+            <select value={service} onChange={e=>selectService(e.target.value)} style={inp}>
+              <option value="">— Select —</option>
+              {serviceOptions.map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
 
           {needsDims&&(
@@ -897,20 +938,12 @@ function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,
             </div>
           )}
 
-          <div style={{marginBottom:12}}>
-            <label style={lbl}>{category==="other"?"Service":"Material / Finish"}</label>
-            <select value={material} onChange={e=>{setMaterial(e.target.value);setRateId("");}} style={inp}>
-              <option value="">— Select —</option>
-              {materials.map(m=><option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-
-          {material&&(
+          {service&&(
             <div style={{marginBottom:12}}>
-              <label style={lbl}>Subcontractor</label>
+              <label style={lbl}>Contractor{matchingRates.some(r=>r.isPinned)?" (default pinned — switch to override)":""}</label>
               <select value={rateId} onChange={e=>setRateId(e.target.value)} style={inp}>
                 <option value="">— Select —</option>
-                {matchingRates.map(r=><option key={r.id} value={r.id}>{r.subcontractor} — {fmt(r.price)}/{r.unit}</option>)}
+                {matchingRates.map(r=><option key={r.id} value={r.id}>{r.isPinned?"★ ":""}{r.subcontractor} — {fmt(r.price)}/{r.unit}</option>)}
               </select>
             </div>
           )}
@@ -944,8 +977,35 @@ function PricingCalculatorTab({rates,onAdd,onUpdate,onDelete,quotes,targetQuote,
 
           {addedMsg&&<div style={{fontSize:12,color:OLIVE_LIGHT,marginBottom:10}}>{addedMsg}</div>}
 
-          <button disabled={!canAdd} onClick={addToQuote} style={{...btn(canAdd?ORANGE:"#374151"),opacity:canAdd?1:0.6,cursor:canAdd?"pointer":"not-allowed"}}>Add to Quote</button>
-          {!targetQuote&&<div style={{fontSize:11,color:"#c05a3a",marginTop:8}}>Select a target quote above to enable adding.</div>}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            <button disabled={!canBuild} onClick={addItemToCart} style={{...btn(canBuild?OLIVE:"#374151"),opacity:canBuild?1:0.6,cursor:canBuild?"pointer":"not-allowed"}}>Add Item</button>
+            <button disabled={!canAddToQuote} onClick={addToQuote} style={{...btn(canAddToQuote?ORANGE:"#374151"),opacity:canAddToQuote?1:0.6,cursor:canAddToQuote?"pointer":"not-allowed"}}>Add to Quote</button>
+            {!targetQuote&&<div style={{fontSize:11,color:"#c05a3a"}}>Select a target quote above to add directly to it.</div>}
+          </div>
+        </div>
+
+        <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
+          <div style={secTitle}>Quote Items Cart</div>
+          {cart.length===0?(
+            <div style={{fontSize:12,color:"#6b7280"}}>No items yet. Configure an item above and click "Add Item" to stage it here.</div>
+          ):(
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+              {cart.map(i=>(
+                <div key={i.id} style={{background:BG,borderRadius:8,padding:"10px 14px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+                    <div style={{fontSize:13,fontWeight:600,color:"#e5e7eb"}}>{i.itemName}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{fontSize:14,fontWeight:700,color:ORANGE_LIGHT}}>{fmt(i.total)}</div>
+                      <span onClick={()=>removeFromCart(i.id)} style={{color:"#c05a3a",cursor:"pointer",fontSize:12}}>Remove</span>
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:"#6b7280",marginTop:4}}>Internal only — {i.subcontractorName}: cost {fmt(i.subcontractorCost)} · profit {fmt(i.profitAmount)}</div>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:700,paddingTop:8,borderTop:"1px solid #3a4832"}}><span>Cart Total</span><span>{fmt(cartTotal)}</span></div>
+            </div>
+          )}
+          <button disabled={cart.length===0} onClick={createQuoteFromCart} style={{...btn(cart.length?ORANGE:"#374151"),opacity:cart.length?1:0.6,cursor:cart.length?"pointer":"not-allowed"}}>Create New Quote from These Items</button>
         </div>
 
         {showDimModal&&<DimensionModal category={category} initial={dims} onCancel={()=>setShowDimModal(false)} onConfirm={d=>{setDims(d);setShowDimModal(false);}}/>}
@@ -997,6 +1057,7 @@ function App(){
   const deleteRate=async(id)=>{await dbDeleteRate(id);setRates(p=>p.filter(r=>r.id!==id));};
   const openCalculator=q=>{setCurrent(q);setView("calculator");};
   const addLineItemToCurrent=item=>setCurrent(p=>p?{...p,items:[...p.items,item]}:p);
+  const createQuoteFromCart=items=>{setCurrent({...eQuote(),items});setView("editor");};
 
   const filtered=filter==="All"?quotes:quotes.filter(q=>q.status===filter);
   const totalOwed=quotes.filter(q=>!["Paid in Full","Draft"].includes(q.status)).reduce((s,q)=>s+tot(q),0);
@@ -1005,7 +1066,7 @@ function App(){
 
   if(view==="editor")return<Editor quote={current} onSave={saveQuote} onCancel={()=>setView("dashboard")} onDelete={deleteQuote} saveStatus={saveStatus} onOpenCalculator={openCalculator}/>;
   if(view==="preview")return<PrintView q={current} onBack={()=>setView("dashboard")}/>;
-  if(view==="calculator")return<PricingCalculatorTab rates={rates} onAdd={addRate} onUpdate={updateRate} onDelete={deleteRate} quotes={quotes} targetQuote={current} onSelectTarget={setCurrent} onAddLineItem={addLineItemToCurrent} onDone={()=>setView(current?"editor":"dashboard")}/>;
+  if(view==="calculator")return<PricingCalculatorTab rates={rates} onAdd={addRate} onUpdate={updateRate} onDelete={deleteRate} quotes={quotes} targetQuote={current} onSelectTarget={setCurrent} onAddLineItem={addLineItemToCurrent} onCreateQuoteFromCart={createQuoteFromCart} onDone={()=>setView(current?"editor":"dashboard")}/>;
 
   return(
     <div style={{minHeight:"100vh",background:BG,color:"#e5e7eb",fontFamily:"Georgia,serif",padding:"24px 16px"}}>

@@ -9,3 +9,9 @@ create table if not exists subcontractor_rates (
 );
 
 alter table subcontractor_rates disable row level security;
+
+-- Note: this table stores each rate as an opaque JSON blob in `data` (the anon
+-- key can't ALTER TABLE). The `is_pinned` flag used by the "Pin as default
+-- contractor" feature lives inside that JSON payload as `isPinned`, alongside
+-- `service`, `subcontractor`, `unit`, `price`, etc. — no schema migration
+-- needed here, it works with the table as created above.
