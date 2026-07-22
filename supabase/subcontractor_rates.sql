@@ -13,5 +13,12 @@ alter table subcontractor_rates disable row level security;
 -- Note: this table stores each rate as an opaque JSON blob in `data` (the anon
 -- key can't ALTER TABLE). The `is_pinned` flag used by the "Pin as default
 -- contractor" feature lives inside that JSON payload as `isPinned`, alongside
--- `service`, `subcontractor`, `unit`, `price`, etc. — no schema migration
--- needed here, it works with the table as created above.
+-- `service`, `subcontractor`, `unit`, `price`, `suggestedProfitType`,
+-- `suggestedProfitValue`, etc. — no schema migration needed here, it works
+-- with the table as created above.
+--
+-- Found in production: the live table was missing `created_at` even though
+-- this script defines it, which made every `order=created_at.asc` read 400
+-- and silently fall back to re-seeding DEFAULT_RATES — discarding all real
+-- edits on every page load. The app now orders by `id` instead (always
+-- present) so it no longer depends on `created_at` existing.
