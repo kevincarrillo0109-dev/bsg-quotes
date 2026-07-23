@@ -826,13 +826,11 @@ function SmartAddPanel({rates,onAdd}){
   const handleAdd=()=>{
     if(!canAdd)return;
     const label=category==="other"?service:`${RATE_CATEGORY_LABEL[category]} - ${service}`;
-    const unitLabel=selectedRate.unit;
-    const desc=category==="other"
-      ?`${service} — ${quantity} ${unitLabel}`
-      :`${RATE_CATEGORY_LABEL[category]} installation — ${service}, ${quantity} ${unitLabel}`;
+    const productKey=rateProductKey(category,service);
+    const desc=(PRODUCTS[productKey]&&PRODUCTS[productKey].desc)||"";
     onAdd({
       id:Date.now()+Math.random(),
-      productKey:rateProductKey(category,service),
+      productKey,
       itemName:label,
       desc,
       qty:quantity,
