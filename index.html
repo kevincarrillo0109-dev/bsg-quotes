@@ -86,17 +86,21 @@ async function dbGetOne(id){
 }
 
 async function dbGetAllRates(){
+  // Returns null on any fetch failure (as opposed to []) so callers can tell
+  // "table is genuinely empty" apart from "request failed" — conflating the
+  // two previously caused the app to silently re-seed DEFAULT_RATES over real
+  // production data whenever this request errored for any reason.
   try{
     const r=await fetch(`${SUPABASE_URL}/rest/v1/subcontractor_rates?select=*&order=id.asc`,{headers:hdrs});
     if(!r.ok){
       const body = await r.text().catch(()=>'<unreadable body>');
       console.error('dbGetAllRates fetch failed', r.status, body);
-      return [];
+      return null;
     }
     return r.json();
   }catch(e){
     console.error('dbGetAllRates exception', e);
-    return [];
+    return null;
   }
 }
 async function dbUpsertRate(rt){
@@ -936,6 +940,7 @@ function App(){
   React.useEffect(()=>{dbGetAll().then(rows=>{setQuotes(rows.map(r=>JSON.parse(r.data)));setLoading(false);});},[]);
   React.useEffect(()=>{
     dbGetAllRates().then(async rows=>{
+      if(rows===null)return;
       if(rows.length===0){
         await Promise.all(DEFAULT_RATES.map(dbUpsertRate));
         setRates(DEFAULT_RATES);
