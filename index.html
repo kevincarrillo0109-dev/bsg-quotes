@@ -171,19 +171,19 @@ function rateProductKey(category,service){return(RATE_CATEGORY_PRODUCT_KEY[categ
 function genRateId(){return`rate-${Date.now()}-${Math.floor(Math.random()*900+100)}`;}
 
 const DEFAULT_RATES=[
-  {id:"seed-plaster-standardwhite-alfonso-linft",category:"plaster",service:"Standard White",subcontractor:"Alfonso",unit:"linear ft",price:33.33},
-  {id:"seed-plaster-standardwhite-alfonso-sqft",category:"plaster",service:"Standard White",subcontractor:"Alfonso",unit:"sq ft",price:3.40},
-  {id:"seed-plaster-bluequartz-alfonso-linft",category:"plaster",service:"Blue Quartz Aggregate",subcontractor:"Alfonso",unit:"linear ft",price:41.90},
-  {id:"seed-plaster-bluequartz-alfonso-sqft",category:"plaster",service:"Blue Quartz Aggregate",subcontractor:"Alfonso",unit:"sq ft",price:4.27},
-  {id:"seed-plaster-stonescapes-alfonso-linft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"linear ft",price:86.92},
-  {id:"seed-plaster-stonescapes-alfonso-sqft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"sq ft",price:8.86},
-  {id:"seed-coping-lueders-alfonso",category:"coping",service:"Lueders Limestone",subcontractor:"Alfonso",unit:"linear ft",price:37.14},
-  {id:"seed-coping-lueders-javier",category:"coping",service:"Lueders Limestone",subcontractor:"Javier",unit:"linear ft",price:35.00},
-  {id:"seed-coping-oklahoma-alfonso",category:"coping",service:"Oklahoma Flagstone",subcontractor:"Alfonso",unit:"linear ft",price:37.14},
-  {id:"seed-coping-oklahoma-javier",category:"coping",service:"Oklahoma Flagstone",subcontractor:"Javier",unit:"linear ft",price:35.00},
-  {id:"seed-coping-travertine-javier",category:"coping",service:"Travertine",subcontractor:"Javier",unit:"linear ft",price:50.00},
-  {id:"seed-tile-waterline-alfonso",category:"tile",service:"Waterline Tile (6\" standard)",subcontractor:"Alfonso",unit:"linear ft",price:22.86},
-  {id:"seed-tile-waterline-javier",category:"tile",service:"Waterline Tile (6\" standard)",subcontractor:"Javier",unit:"linear ft",price:22.00},
+  {id:"seed-plaster-standardwhite-alfonso-linft",category:"plaster",service:"Standard White",subcontractor:"Alfonso",unit:"linear ft",price:33.33,suggestedProfitType:"flat",suggestedProfitValue:1000},
+  {id:"seed-plaster-standardwhite-alfonso-sqft",category:"plaster",service:"Standard White",subcontractor:"Alfonso",unit:"sq ft",price:3.40,suggestedProfitType:"flat",suggestedProfitValue:1000},
+  {id:"seed-plaster-bluequartz-alfonso-linft",category:"plaster",service:"Blue Quartz Aggregate",subcontractor:"Alfonso",unit:"linear ft",price:41.90,suggestedProfitType:"flat",suggestedProfitValue:1000},
+  {id:"seed-plaster-bluequartz-alfonso-sqft",category:"plaster",service:"Blue Quartz Aggregate",subcontractor:"Alfonso",unit:"sq ft",price:4.27,suggestedProfitType:"flat",suggestedProfitValue:1000},
+  {id:"seed-plaster-stonescapes-alfonso-linft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"linear ft",price:86.92,suggestedProfitType:"flat",suggestedProfitValue:1000},
+  {id:"seed-plaster-stonescapes-alfonso-sqft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"sq ft",price:8.86,suggestedProfitType:"flat",suggestedProfitValue:1000},
+  {id:"seed-coping-lueders-alfonso",category:"coping",service:"Lueders Limestone",subcontractor:"Alfonso",unit:"linear ft",price:37.14,suggestedProfitType:"flat",suggestedProfitValue:500},
+  {id:"seed-coping-lueders-javier",category:"coping",service:"Lueders Limestone",subcontractor:"Javier",unit:"linear ft",price:35.00,suggestedProfitType:"flat",suggestedProfitValue:500},
+  {id:"seed-coping-oklahoma-alfonso",category:"coping",service:"Oklahoma Flagstone",subcontractor:"Alfonso",unit:"linear ft",price:37.14,suggestedProfitType:"flat",suggestedProfitValue:500},
+  {id:"seed-coping-oklahoma-javier",category:"coping",service:"Oklahoma Flagstone",subcontractor:"Javier",unit:"linear ft",price:35.00,suggestedProfitType:"flat",suggestedProfitValue:500},
+  {id:"seed-coping-travertine-javier",category:"coping",service:"Travertine",subcontractor:"Javier",unit:"linear ft",price:50.00,suggestedProfitType:"flat",suggestedProfitValue:500},
+  {id:"seed-tile-waterline-alfonso",category:"tile",service:"Waterline Tile (6\" standard)",subcontractor:"Alfonso",unit:"linear ft",price:22.86,suggestedProfitType:"flat",suggestedProfitValue:500},
+  {id:"seed-tile-waterline-javier",category:"tile",service:"Waterline Tile (6\" standard)",subcontractor:"Javier",unit:"linear ft",price:22.00,suggestedProfitType:"flat",suggestedProfitValue:500},
   {id:"seed-other-mastic-javier",category:"other",service:"Mastic Replacement",subcontractor:"Javier",unit:"linear ft",price:4.50},
   {id:"seed-other-skimmer-alfonso",category:"other",service:"Skimmer Replacement",subcontractor:"Alfonso",unit:"each",price:1200.00},
 ];
@@ -335,7 +335,7 @@ function PrintView({q,onBack}){
               const unit=Number(item.unit)||0;
               const total=Number(item.total)||0;
               const cat=PRODUCTS[item.productKey]?PRODUCTS[item.productKey].category:"other";
-              const unitLabel=qtyUnit(cat);
+              const unitLabel=item.qtyUnitLabel!=null?item.qtyUnitLabel:qtyUnit(cat);
               return(
                 <div key={item.id} style={{borderRadius:10,overflow:"hidden",marginBottom:12,boxShadow:"0 1px 6px rgba(0,0,0,0.08)"}}>
                   <div style={{background:"#4a5c3a",padding:"11px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -800,7 +800,6 @@ function SmartAddPanel({rates,onAdd}){
   const subCost=selectedRate?quantity*Number(selectedRate.price):0;
   const profitAmount=profitType==="percent"?subCost*(Number(profitValue)||0)/100:(Number(profitValue)||0);
   const clientTotal=subCost+profitAmount;
-  const unitPrice=quantity>0?clientTotal/quantity:0;
 
   const applySuggestedProfit=r=>{
     setProfitType(r&&r.suggestedProfitType?r.suggestedProfitType:"percent");
@@ -812,7 +811,8 @@ function SmartAddPanel({rates,onAdd}){
     setQty("");
     const rowsForSvc=rates.filter(r=>r.service===svc);
     const pinned=rowsForSvc.find(r=>r.isPinned);
-    const chosen=pinned||(rowsForSvc.length===1?rowsForSvc[0]:null);
+    const alfonso=rowsForSvc.find(r=>r.subcontractor==="Alfonso");
+    const chosen=pinned||alfonso||(rowsForSvc.length===1?rowsForSvc[0]:null);
     setRateId(chosen?chosen.id:"");
     applySuggestedProfit(chosen);
   };
@@ -836,8 +836,9 @@ function SmartAddPanel({rates,onAdd}){
       itemName:label,
       desc,
       qty:quantity,
-      unit:Math.round(unitPrice*100)/100,
+      unit:Math.round(clientTotal*100)/100,
       total:Math.round(clientTotal*100)/100,
+      qtyUnitLabel:isEach?"":rateTypeLabel(selectedRate.unit).replace("Per ",""),
       isFlat:false,
       subcontractorName:selectedRate.subcontractor,
       subcontractorCost:Math.round(subCost*100)/100,
@@ -936,7 +937,7 @@ function App(){
   const updateRate=async(rt)=>{const ok=await dbUpsertRate(rt);if(ok)setRates(p=>p.map(r=>r.id===rt.id?rt:r));};
   const deleteRate=async(id)=>{await dbDeleteRate(id);setRates(p=>p.filter(r=>r.id!==id));};
   const openNewQuote=()=>{setCurrent(eQuote());setSmartAddDefault(false);setView("editor");};
-  const openSmartQuote=()=>{setCurrent(eQuote());setSmartAddDefault(true);setView("editor");};
+  const openSmartQuote=()=>{setCurrent({...eQuote(),items:[]});setSmartAddDefault(true);setView("editor");};
   const openEditQuote=q=>{setCurrent(q);setSmartAddDefault(false);setView("editor");};
 
   const filtered=filter==="All"?quotes:quotes.filter(q=>q.status===filter);
