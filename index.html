@@ -176,6 +176,11 @@ const RATE_CATEGORY_PRODUCT_KEY={
   tile:{"Waterline Tile (6\" standard)":"Waterline Tile Replacement"},
   other:{},
 };
+// Per-service Smart Add default contractor that wins over any pinned rate (manual
+// switching still works), plus the line item name used when that contractor is picked.
+const SERVICE_DEFAULT_CONTRACTOR={
+  "StoneScapes / Mini Pebble":{subcontractor:"Javier Replaster",itemName:"Mini Pebble"},
+};
 function rateProductKey(category,service){return(RATE_CATEGORY_PRODUCT_KEY[category]&&RATE_CATEGORY_PRODUCT_KEY[category][service])||"Add-On Service";}
 function genRateId(){return`rate-${Date.now()}-${Math.floor(Math.random()*900+100)}`;}
 
@@ -186,6 +191,7 @@ const DEFAULT_RATES=[
   {id:"seed-plaster-bluequartz-alfonso-sqft",category:"plaster",service:"Blue Quartz Aggregate",subcontractor:"Alfonso",unit:"sq ft",price:4.27,suggestedProfitType:"flat",suggestedProfitValue:1000},
   {id:"seed-plaster-stonescapes-alfonso-linft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"linear ft",price:86.92,suggestedProfitType:"flat",suggestedProfitValue:1000},
   {id:"seed-plaster-stonescapes-alfonso-sqft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Alfonso",unit:"sq ft",price:8.86,suggestedProfitType:"flat",suggestedProfitValue:1000},
+  {id:"seed-plaster-stonescapes-javierreplaster-linft",category:"plaster",service:"StoneScapes / Mini Pebble",subcontractor:"Javier Replaster",unit:"linear ft",price:60.00,suggestedProfitType:"flat",suggestedProfitValue:1000},
   {id:"seed-coping-lueders-alfonso",category:"coping",service:"Lueders Limestone",subcontractor:"Alfonso",unit:"linear ft",price:37.14,suggestedProfitType:"flat",suggestedProfitValue:500},
   {id:"seed-coping-lueders-javier",category:"coping",service:"Lueders Limestone",subcontractor:"Javier",unit:"linear ft",price:35.00,suggestedProfitType:"flat",suggestedProfitValue:500},
   {id:"seed-coping-oklahoma-alfonso",category:"coping",service:"Oklahoma Flagstone",subcontractor:"Alfonso",unit:"linear ft",price:37.14,suggestedProfitType:"flat",suggestedProfitValue:500},
@@ -206,18 +212,56 @@ function payoutSummary(q){
 }
 
 // ─── Scope of Work Data ───────────────────────────────────
-const PLASTER_SCOPE=[
-  {title:"1. Pool Interior Resurfacing",items:["Drain the pool and remove all hydrostatic plugs as needed.","Project includes standard industry surface preparation methods prior to plaster installation, including treatment of areas as needed to provide a suitable bonding surface.","Acid wash and clean interior surface thoroughly.","Apply bonding agent (primer coat) to entire pool shell.","Install new plaster finish per selected material — hand-troweled for a smooth, uniform finish.","Perform standard startup procedure: brush daily, monitor chemical levels, and ensure proper curing."]},
+// Single source of truth for every scope section. Array order = render order, used by
+// both the auto-attached scope and the "Custom scope of work" picker. To offer a new
+// common service, add an entry here. autoNum = the fixed number the auto scope shows
+// (auto scope attaches a section when a line item has the same category as `key`).
+// custom:true = free-form section filled in from q.custom_scope_other.
+// final:true = always rendered last and unnumbered.
+const SCOPE_SECTIONS=[
+  {key:"plaster",title:"Pool Interior Resurfacing",autoNum:1,items:["Drain the pool and remove all hydrostatic plugs as needed.","Project includes standard industry surface preparation methods prior to plaster installation, including treatment of areas as needed to provide a suitable bonding surface.","Acid wash and clean interior surface thoroughly.","Apply bonding agent (primer coat) to entire pool shell.","Install new plaster finish per selected material — hand-troweled for a smooth, uniform finish.","Perform standard startup procedure: brush daily, monitor chemical levels, and ensure proper curing."]},
+  {key:"tile",title:"Waterline Tile Removal & Installation",autoNum:2,items:["Remove existing waterline tile and prepare surface.","Clean and level the waterline bond beam.","Install new 6\"x6\" frost-resistant porcelain tile selected by client.","Apply tile adhesive and waterproof grout for long-term durability.","Clean all tile joints and polish finish."]},
+  {key:"coping",title:"Coping Demolition & Installation",autoNum:3,items:["Remove existing coping around the full pool perimeter.","Prep edge and set new coping using selected stone — 2\" thick.","Use mortar base and spacers to ensure level installation.","Custom hand-cut corners and curves as needed.","Finish with appropriate joint grout and cleanup.","Natural stone may vary slightly in color and texture."]},
+  {key:"other",title:"Other",custom:true,items:[]},
+  {key:"final",title:"Final Cleaning, Fill-Up & Inspection",final:true,defaultChecked:true,items:["Clean surrounding work areas, rinse deck and coping.","Begin controlled pool refill upon curing of plaster.","Perform final quality inspection and walkthrough with client to confirm completion and satisfaction."]},
 ];
-const TILE_SCOPE=[
-  {title:"2. Waterline Tile Removal & Installation",items:["Remove existing waterline tile and prepare surface.","Clean and level the waterline bond beam.","Install new 6\"x6\" frost-resistant porcelain tile selected by client.","Apply tile adhesive and waterproof grout for long-term durability.","Clean all tile joints and polish finish."]},
-];
-const COPING_SCOPE=[
-  {title:"3. Coping Demolition & Installation",items:["Remove existing coping around the full pool perimeter.","Prep edge and set new coping using selected stone — 2\" thick.","Use mortar base and spacers to ensure level installation.","Custom hand-cut corners and curves as needed.","Finish with appropriate joint grout and cleanup.","Natural stone may vary slightly in color and texture."]},
-];
-const FINAL_SCOPE=[
-  {title:"Final Cleaning, Fill-Up & Inspection",items:["Clean surrounding work areas, rinse deck and coping.","Begin controlled pool refill upon curing of plaster.","Perform final quality inspection and walkthrough with client to confirm completion and satisfaction."]},
-];
+
+// Auto scope (unchanged behavior): pool sections matching the quote's categories, keeping
+// their fixed 1/2/3 numbers, followed by Final Cleaning whenever any pool section attached.
+function autoScopeSections(cats){
+  const out=SCOPE_SECTIONS.filter(s=>s.autoNum&&cats.has(s.key)).map(s=>({title:`${s.autoNum}. ${s.title}`,items:s.items}));
+  if(out.length>0)SCOPE_SECTIONS.filter(s=>s.final).forEach(s=>out.push({title:s.title,items:s.items}));
+  return out;
+}
+// Old quotes predate these fields — fill safe defaults so they load unchecked and never hold null arrays.
+function withCustomScopeDefaults(q){
+  const other=q.custom_scope_other||{};
+  return{
+    ...q,
+    custom_scope_enabled:!!q.custom_scope_enabled,
+    custom_scope_sections:Array.isArray(q.custom_scope_sections)?q.custom_scope_sections:[],
+    custom_scope_other:{title:typeof other.title==="string"?other.title:"",bullets:Array.isArray(other.bullets)?other.bullets:[]},
+  };
+}
+// Custom scope: checked sections in SCOPE_SECTIONS order, numbered 1, 2, 3… by what's checked;
+// final sections render last and unnumbered.
+function customScopeSections(quote){
+  const q=withCustomScopeDefaults(quote);
+  const picked=new Set(q.custom_scope_sections);
+  const numbered=[],finals=[];
+  SCOPE_SECTIONS.forEach(s=>{
+    if(!picked.has(s.key))return;
+    if(s.final){finals.push({title:s.title,items:s.items});return;}
+    let title=s.title,items=s.items;
+    if(s.custom){
+      items=q.custom_scope_other.bullets.map(b=>String(b).trim()).filter(Boolean);
+      title=q.custom_scope_other.title.trim()||s.title;
+      if(!q.custom_scope_other.title.trim()&&items.length===0)return;
+    }
+    numbered.push({title:`${numbered.length+1}. ${title}`,items});
+  });
+  return[...numbered,...finals];
+}
 
 const STATUSES=["Draft","Sent","Deposit Paid","Paid in Full","Overdue"];
 const SC={"Draft":"#8a9a7a","Sent":"#c9813a","Deposit Paid":"#d4a843","Paid in Full":"#6a8f5a","Overdue":"#c05a3a"};
@@ -247,7 +291,7 @@ function getCats(items){
 }
 
 const eItem=()=>({id:Date.now()+Math.random(),productKey:"Add-On Service",itemName:"",desc:"",qty:1,unit:0,total:0,isFlat:false});
-const eQuote=()=>({id:genId(),quoteNumber:genQN(),date:today(),client:"",address:"",deposit:"",items:[eItem()],discount:0,taxEnabled:false,taxAmount:0,status:"Draft",notes:"",editScope:false,customScope:"",offer_financing:true});
+const eQuote=()=>({id:genId(),quoteNumber:genQN(),date:today(),client:"",address:"",deposit:"",items:[eItem()],discount:0,taxEnabled:false,taxAmount:0,status:"Draft",notes:"",editScope:false,customScope:"",custom_scope_enabled:false,custom_scope_sections:[],custom_scope_other:{title:"",bullets:[]},offer_financing:true});
 const sub=q=>q.items.reduce((s,i)=>s+(Number(i.total)||0),0);
 const dsc=q=>sub(q)*(Number(q.discount)||0)/100;
 const tx=q=>q.taxEnabled?Number(q.taxAmount)||0:0;
@@ -264,11 +308,7 @@ function Logo({size=80}){return <img src={LOGO_DATA} style={{width:size,height:s
 
 // ─── Scope Pages ─────────────────────────────────────────
 function PoolScopePage({cats,q}){
-  const sections=[];
-  if(cats.has("plaster"))sections.push(...PLASTER_SCOPE);
-  if(cats.has("tile"))sections.push(...TILE_SCOPE);
-  if(cats.has("coping"))sections.push(...COPING_SCOPE);
-  if(sections.length>0)sections.push(...FINAL_SCOPE);
+  const sections=autoScopeSections(cats);
   if(sections.length===0)return null;
   return(
     <div style={{background:"#fff",padding:"48px 56px",position:"relative",fontFamily:"Georgia,serif",color:"#222",maxWidth:820,margin:"0 auto"}}>
@@ -295,13 +335,48 @@ function PoolScopePage({cats,q}){
 
 
 // ─── Print / Customer View ───────────────────────────────
+function ScopeSectionList({sections}){
+  return sections.map((s,i)=>(
+    <div key={i} style={{marginBottom:14}}>
+      <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>{s.title}</div>
+      <ul style={{paddingLeft:18}}>{s.items.map((it,j)=><li key={j} style={{marginBottom:4}}>{it}</li>)}</ul>
+    </div>
+  ));
+}
+
+function TrampolineInfo(){
+  return(
+    <div style={{marginTop:8}}>
+      <div style={{marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Two Ways to Buy</div>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}>You can purchase your trampoline two ways. Both cost the same — the trampoline price is identical whether you order it yourself or have us handle it.</p>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}><strong>Option 1 — We supply it (simplest):</strong> We order the trampoline for you and install it. You get one point of contact for the whole project, and your trampoline and installation are covered under a single warranty through us. We make sure the unit matches your site and drainage setup, coordinate delivery, and handle the unit if anything arrives damaged. Nothing for you to manage.</p>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}><strong>Option 2 — You supply it:</strong> You purchase the trampoline yourself, and we install it. This works too — just note that a self-ordered unit needs to match the excavation and drainage specs, and your coverage is split between two companies: the manufacturer for the trampoline, and us for the installation. Either way, the trampoline price is the same.</p>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>We Handle Utility Line Clearance (811)</div>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Before any digging starts, we coordinate your 811 utility inspection for you. A team comes out to locate and mark any underground lines — electrical, gas, water, sewer, and internet — running through the dig area, so excavation happens safely with nothing damaged. It's a required step before any inground project, and we manage the entire process on your behalf. One less thing for you to schedule or worry about.</p>
+      </div>
+      <div>
+        <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Drainage</div>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Inground pits sit below grade, so they naturally collect rainwater. A proper drainage system is what keeps the trampoline usable year-round instead of sitting over standing water.</p>
+      </div>
+    </div>
+  );
+}
+
 function PrintView({q,onBack}){
   const cats=getCats(q.items);
   const hasPool=cats.has("plaster")||cats.has("tile")||cats.has("coping");
   const hasTrampoline=cats.has("trampoline");
-  const showPool=hasPool&&!(q.editScope&&q.customScope);
-  const showTrampoline=hasTrampoline&&!(q.editScope&&q.customScope);
-  const hasScope=showPool||showTrampoline||(q.editScope&&q.customScope);
+  const legacyText=q.editScope&&q.customScope;
+  // "Custom scope of work" only swaps the pool sections; the trampoline info (and its
+  // "Customize" text override) always renders exactly as it does without custom scope.
+  const customOn=!!q.custom_scope_enabled;
+  const poolSections=customOn?customScopeSections(q):autoScopeSections(cats);
+  const showPool=hasPool&&!legacyText;
+  const showTrampoline=hasTrampoline&&!legacyText;
+  const hasScope=customOn?(poolSections.length>0||hasTrampoline):(showPool||showTrampoline||legacyText);
   const[scopeOpen,setScopeOpen]=React.useState(false);
 
   return(
@@ -395,40 +470,16 @@ function PrintView({q,onBack}){
               </button>
               {scopeOpen&&(
                 <div style={{marginTop:14,fontSize:12,color:"#444",lineHeight:1.7}}>
-                  {q.editScope&&q.customScope
+                  {customOn
+                    ?<div>
+                      <ScopeSectionList sections={poolSections}/>
+                      {hasTrampoline&&(legacyText?<div style={{whiteSpace:"pre-line"}}>{q.customScope}</div>:<TrampolineInfo/>)}
+                    </div>
+                    :legacyText
                     ?<div style={{whiteSpace:"pre-line"}}>{q.customScope}</div>
                     :<div>
-                      {(()=>{
-                        const sections=[];
-                        if(cats.has("plaster"))sections.push(...PLASTER_SCOPE);
-                        if(cats.has("tile"))sections.push(...TILE_SCOPE);
-                        if(cats.has("coping"))sections.push(...COPING_SCOPE);
-                        if(sections.length>0)sections.push(...FINAL_SCOPE);
-                        return sections.map((s,i)=>(
-                          <div key={i} style={{marginBottom:14}}>
-                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>{s.title}</div>
-                            <ul style={{paddingLeft:18}}>{s.items.map((it,j)=><li key={j} style={{marginBottom:4}}>{it}</li>)}</ul>
-                          </div>
-                        ));
-                      })()}
-                      {hasTrampoline&&(
-                        <div style={{marginTop:8}}>
-                          <div style={{marginBottom:14}}>
-                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Two Ways to Buy</div>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}>You can purchase your trampoline two ways. Both cost the same — the trampoline price is identical whether you order it yourself or have us handle it.</p>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}><strong>Option 1 — We supply it (simplest):</strong> We order the trampoline for you and install it. You get one point of contact for the whole project, and your trampoline and installation are covered under a single warranty through us. We make sure the unit matches your site and drainage setup, coordinate delivery, and handle the unit if anything arrives damaged. Nothing for you to manage.</p>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}><strong>Option 2 — You supply it:</strong> You purchase the trampoline yourself, and we install it. This works too — just note that a self-ordered unit needs to match the excavation and drainage specs, and your coverage is split between two companies: the manufacturer for the trampoline, and us for the installation. Either way, the trampoline price is the same.</p>
-                          </div>
-                          <div style={{marginBottom:14}}>
-                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>We Handle Utility Line Clearance (811)</div>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Before any digging starts, we coordinate your 811 utility inspection for you. A team comes out to locate and mark any underground lines — electrical, gas, water, sewer, and internet — running through the dig area, so excavation happens safely with nothing damaged. It's a required step before any inground project, and we manage the entire process on your behalf. One less thing for you to schedule or worry about.</p>
-                          </div>
-                          <div>
-                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Drainage</div>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Inground pits sit below grade, so they naturally collect rainwater. A proper drainage system is what keeps the trampoline usable year-round instead of sitting over standing water.</p>
-                          </div>
-                        </div>
-                      )}
+                      <ScopeSectionList sections={poolSections}/>
+                      {hasTrampoline&&<TrampolineInfo/>}
                     </div>
                   }
                 </div>
@@ -456,7 +507,7 @@ function ClientView({qid}){
 
 // ─── Editor ──────────────────────────────────────────────
 function Editor({quote,rates,onSave,onCancel,onDelete,saveStatus,smartAddDefaultOpen}){
-  const[q,setQ]=React.useState(quote);
+  const[q,setQ]=React.useState(()=>withCustomScopeDefaults(quote));
   const[showSmartAdd,setShowSmartAdd]=React.useState(!!smartAddDefaultOpen);
   const set=(k,v)=>setQ(p=>({...p,[k]:v}));
   const addSmartItem=item=>setQ(p=>({...p,items:[...p.items,item]}));
@@ -473,11 +524,26 @@ function Editor({quote,rates,onSave,onCancel,onDelete,saveStatus,smartAddDefault
   const setItem=(id,k,v)=>setQ(p=>({...p,items:p.items.map(i=>i.id===id?{...i,[k]:v}:i)}));
   const addItem=()=>setQ(p=>({...p,items:[...p.items,eItem()]}));
   const removeItem=id=>setQ(p=>({...p,items:p.items.filter(i=>i.id!==id)}));
+  const toggleCustomScope=on=>setQ(p=>{
+    const pc=getCats(p.items);
+    const quoteHasPool=pc.has("plaster")||pc.has("tile")||pc.has("coping");
+    return{
+      ...p,
+      custom_scope_enabled:on,
+      // First time on (nothing picked yet): start with the default-checked sections, but only
+      // for quotes with pool work — trampoline-only quotes start with nothing ticked.
+      custom_scope_sections:on&&p.custom_scope_sections.length===0&&quoteHasPool?SCOPE_SECTIONS.filter(s=>s.defaultChecked).map(s=>s.key):p.custom_scope_sections,
+    };
+  });
+  const toggleScopeSection=(key,on)=>setQ(p=>({...p,custom_scope_sections:on?[...p.custom_scope_sections.filter(k=>k!==key),key]:p.custom_scope_sections.filter(k=>k!==key)}));
+  const setScopeOther=(k,v)=>setQ(p=>({...p,custom_scope_other:{...p.custom_scope_other,[k]:v}}));
 
   const cats=getCats(q.items);
   const hasPool=cats.has("plaster")||cats.has("tile")||cats.has("coping");
   const hasTrampoline=cats.has("trampoline");
   const hasScopeService=hasPool||hasTrampoline;
+  // With custom scope on, the old free-text "Customize" only applies to the trampoline section.
+  const showLegacyCustomize=hasScopeService&&(!q.custom_scope_enabled||hasTrampoline);
   const s=sub(q),d=dsc(q),t=tx(q),total_=tot(q);
 
   return(
@@ -561,25 +627,52 @@ function Editor({quote,rates,onSave,onCancel,onDelete,saveStatus,smartAddDefault
           </div>
         </div>
         {/* Scope section */}
-        {hasScopeService&&(
-          <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={secTitle}>Scope of Work</div>
+        <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <div style={secTitle}>Scope of Work</div>
+            {showLegacyCustomize&&(
               <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#9ca3af",cursor:"pointer"}}>
                 <input type="checkbox" checked={!!q.editScope} onChange={e=>set("editScope",e.target.checked)}/>
                 Customize
               </label>
-            </div>
-            {q.editScope
-              ?<textarea value={q.customScope||""} onChange={e=>set("customScope",e.target.value)} placeholder="Type your custom scope or notes here..." style={{...inp,height:160,resize:"vertical"}}/>
-              :<div style={{fontSize:12,color:"#6b7280",lineHeight:1.6}}>
-                {[hasPool?"Pool remodeling scope of work will auto-attach (Resurfacing → Tile → Coping + Final Inspection).":null,
-                  hasTrampoline?"Important information section will auto-attach.":null]
-                  .filter(Boolean).join(" ")}
-              </div>
-            }
+            )}
           </div>
-        )}
+          <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#e5e7eb",cursor:"pointer",marginBottom:10}}>
+            <input type="checkbox" checked={q.custom_scope_enabled} onChange={e=>toggleCustomScope(e.target.checked)}/>
+            Custom scope of work
+          </label>
+          {q.custom_scope_enabled&&(
+            <div style={{background:BG,borderRadius:8,padding:12}}>
+              {SCOPE_SECTIONS.map(s=>{
+                const checked=q.custom_scope_sections.includes(s.key);
+                return(
+                  <div key={s.key} style={{marginBottom:6}}>
+                    <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#e5e7eb",cursor:"pointer"}}>
+                      <input type="checkbox" checked={checked} onChange={e=>toggleScopeSection(s.key,e.target.checked)}/>
+                      {s.title}
+                    </label>
+                    {s.custom&&checked&&(
+                      <div style={{margin:"8px 0 10px 24px"}}>
+                        <label style={lbl}>Section Title</label>
+                        <input value={q.custom_scope_other.title} onChange={e=>setScopeOther("title",e.target.value)} placeholder="e.g. Equipment Upgrade" style={{...inp,marginBottom:8}}/>
+                        <label style={lbl}>Bullets (one per line)</label>
+                        <textarea value={q.custom_scope_other.bullets.join("\n")} onChange={e=>setScopeOther("bullets",e.target.value.split("\n"))} style={{...inp,height:100,resize:"vertical"}}/>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {showLegacyCustomize&&(q.editScope
+            ?<textarea value={q.customScope||""} onChange={e=>set("customScope",e.target.value)} placeholder={q.custom_scope_enabled?"Replaces the trampoline Important Information section...":"Type your custom scope or notes here..."} style={{...inp,height:160,resize:"vertical",marginTop:q.custom_scope_enabled?10:0}}/>
+            :<div style={{fontSize:12,color:"#6b7280",lineHeight:1.6,marginTop:q.custom_scope_enabled?10:0}}>
+              {[hasPool&&!q.custom_scope_enabled?"Pool remodeling scope of work will auto-attach (Resurfacing → Tile → Coping + Final Inspection).":null,
+                hasTrampoline?"Important information section will auto-attach.":null]
+                .filter(Boolean).join(" ")}
+            </div>
+          )}
+        </div>
         {/* Totals */}
         <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
           <div style={secTitle}>Totals</div>
@@ -830,9 +923,11 @@ function SmartAddPanel({rates,onAdd}){
     setService(svc);
     setQty("");
     const rowsForSvc=rates.filter(r=>r.service===svc);
+    const svcDefault=SERVICE_DEFAULT_CONTRACTOR[svc];
+    const forced=svcDefault&&rowsForSvc.find(r=>r.subcontractor===svcDefault.subcontractor);
     const pinned=rowsForSvc.find(r=>r.isPinned);
     const alfonso=rowsForSvc.find(r=>r.subcontractor==="Alfonso");
-    const chosen=pinned||alfonso||(rowsForSvc.length===1?rowsForSvc[0]:null);
+    const chosen=forced||pinned||alfonso||(rowsForSvc.length===1?rowsForSvc[0]:null);
     setRateId(chosen?chosen.id:"");
     applySuggestedProfit(chosen);
   };
@@ -845,7 +940,9 @@ function SmartAddPanel({rates,onAdd}){
 
   const handleAdd=()=>{
     if(!canAdd)return;
-    const label=category==="other"?service:`${RATE_CATEGORY_LABEL[category]} - ${service}`;
+    const svcDefault=SERVICE_DEFAULT_CONTRACTOR[service];
+    const label=svcDefault&&selectedRate.subcontractor===svcDefault.subcontractor?svcDefault.itemName
+      :category==="other"?service:`${RATE_CATEGORY_LABEL[category]} - ${service}`;
     const productKey=rateProductKey(category,service);
     const desc=(PRODUCTS[productKey]&&PRODUCTS[productKey].desc)||"";
     onAdd({
