@@ -524,12 +524,17 @@ function Editor({quote,rates,onSave,onCancel,onDelete,saveStatus,smartAddDefault
   const setItem=(id,k,v)=>setQ(p=>({...p,items:p.items.map(i=>i.id===id?{...i,[k]:v}:i)}));
   const addItem=()=>setQ(p=>({...p,items:[...p.items,eItem()]}));
   const removeItem=id=>setQ(p=>({...p,items:p.items.filter(i=>i.id!==id)}));
-  const toggleCustomScope=on=>setQ(p=>({
-    ...p,
-    custom_scope_enabled:on,
-    // First time on (nothing picked yet): start with the default-checked sections.
-    custom_scope_sections:on&&p.custom_scope_sections.length===0?SCOPE_SECTIONS.filter(s=>s.defaultChecked).map(s=>s.key):p.custom_scope_sections,
-  }));
+  const toggleCustomScope=on=>setQ(p=>{
+    const pc=getCats(p.items);
+    const quoteHasPool=pc.has("plaster")||pc.has("tile")||pc.has("coping");
+    return{
+      ...p,
+      custom_scope_enabled:on,
+      // First time on (nothing picked yet): start with the default-checked sections, but only
+      // for quotes with pool work — trampoline-only quotes start with nothing ticked.
+      custom_scope_sections:on&&p.custom_scope_sections.length===0&&quoteHasPool?SCOPE_SECTIONS.filter(s=>s.defaultChecked).map(s=>s.key):p.custom_scope_sections,
+    };
+  });
   const toggleScopeSection=(key,on)=>setQ(p=>({...p,custom_scope_sections:on?[...p.custom_scope_sections.filter(k=>k!==key),key]:p.custom_scope_sections.filter(k=>k!==key)}));
   const setScopeOther=(k,v)=>setQ(p=>({...p,custom_scope_other:{...p.custom_scope_other,[k]:v}}));
 
