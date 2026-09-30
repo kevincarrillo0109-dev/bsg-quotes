@@ -344,16 +344,39 @@ function ScopeSectionList({sections}){
   ));
 }
 
+function TrampolineInfo(){
+  return(
+    <div style={{marginTop:8}}>
+      <div style={{marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Two Ways to Buy</div>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}>You can purchase your trampoline two ways. Both cost the same — the trampoline price is identical whether you order it yourself or have us handle it.</p>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}><strong>Option 1 — We supply it (simplest):</strong> We order the trampoline for you and install it. You get one point of contact for the whole project, and your trampoline and installation are covered under a single warranty through us. We make sure the unit matches your site and drainage setup, coordinate delivery, and handle the unit if anything arrives damaged. Nothing for you to manage.</p>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}><strong>Option 2 — You supply it:</strong> You purchase the trampoline yourself, and we install it. This works too — just note that a self-ordered unit needs to match the excavation and drainage specs, and your coverage is split between two companies: the manufacturer for the trampoline, and us for the installation. Either way, the trampoline price is the same.</p>
+      </div>
+      <div style={{marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>We Handle Utility Line Clearance (811)</div>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Before any digging starts, we coordinate your 811 utility inspection for you. A team comes out to locate and mark any underground lines — electrical, gas, water, sewer, and internet — running through the dig area, so excavation happens safely with nothing damaged. It's a required step before any inground project, and we manage the entire process on your behalf. One less thing for you to schedule or worry about.</p>
+      </div>
+      <div>
+        <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Drainage</div>
+        <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Inground pits sit below grade, so they naturally collect rainwater. A proper drainage system is what keeps the trampoline usable year-round instead of sitting over standing water.</p>
+      </div>
+    </div>
+  );
+}
+
 function PrintView({q,onBack}){
   const cats=getCats(q.items);
   const hasPool=cats.has("plaster")||cats.has("tile")||cats.has("coping");
   const hasTrampoline=cats.has("trampoline");
-  // "Custom scope of work" replaces everything that would otherwise auto-attach below.
+  const legacyText=q.editScope&&q.customScope;
+  // "Custom scope of work" only swaps the pool sections; the trampoline info (and its
+  // "Customize" text override) always renders exactly as it does without custom scope.
   const customOn=!!q.custom_scope_enabled;
-  const customSections=customOn?customScopeSections(q):[];
-  const showPool=hasPool&&!(q.editScope&&q.customScope);
-  const showTrampoline=hasTrampoline&&!(q.editScope&&q.customScope);
-  const hasScope=customOn?customSections.length>0:(showPool||showTrampoline||(q.editScope&&q.customScope));
+  const poolSections=customOn?customScopeSections(q):autoScopeSections(cats);
+  const showPool=hasPool&&!legacyText;
+  const showTrampoline=hasTrampoline&&!legacyText;
+  const hasScope=customOn?(poolSections.length>0||hasTrampoline):(showPool||showTrampoline||legacyText);
   const[scopeOpen,setScopeOpen]=React.useState(false);
 
   return(
@@ -443,34 +466,20 @@ function PrintView({q,onBack}){
             <div className="no-print" style={{marginBottom:20,borderTop:"1px solid #e5e7eb",paddingTop:16}}>
               <button onClick={()=>setScopeOpen(o=>!o)} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:"#4a5c3a",fontSize:13,fontWeight:700,padding:0,width:"100%",textAlign:"left"}}>
                 <span style={{fontSize:10,transition:"transform 0.2s",display:"inline-block",transform:scopeOpen?"rotate(90deg)":"rotate(0deg)"}}>▶</span>
-                <span>{hasTrampoline&&!customOn?"Important Information":"View Scope of Work"}</span>
+                <span>{hasTrampoline?"Important Information":"View Scope of Work"}</span>
               </button>
               {scopeOpen&&(
                 <div style={{marginTop:14,fontSize:12,color:"#444",lineHeight:1.7}}>
                   {customOn
-                    ?<ScopeSectionList sections={customSections}/>
-                    :q.editScope&&q.customScope
+                    ?<div>
+                      <ScopeSectionList sections={poolSections}/>
+                      {hasTrampoline&&(legacyText?<div style={{whiteSpace:"pre-line"}}>{q.customScope}</div>:<TrampolineInfo/>)}
+                    </div>
+                    :legacyText
                     ?<div style={{whiteSpace:"pre-line"}}>{q.customScope}</div>
                     :<div>
-                      <ScopeSectionList sections={autoScopeSections(cats)}/>
-                      {hasTrampoline&&(
-                        <div style={{marginTop:8}}>
-                          <div style={{marginBottom:14}}>
-                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Two Ways to Buy</div>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}>You can purchase your trampoline two ways. Both cost the same — the trampoline price is identical whether you order it yourself or have us handle it.</p>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:"0 0 8px"}}><strong>Option 1 — We supply it (simplest):</strong> We order the trampoline for you and install it. You get one point of contact for the whole project, and your trampoline and installation are covered under a single warranty through us. We make sure the unit matches your site and drainage setup, coordinate delivery, and handle the unit if anything arrives damaged. Nothing for you to manage.</p>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}><strong>Option 2 — You supply it:</strong> You purchase the trampoline yourself, and we install it. This works too — just note that a self-ordered unit needs to match the excavation and drainage specs, and your coverage is split between two companies: the manufacturer for the trampoline, and us for the installation. Either way, the trampoline price is the same.</p>
-                          </div>
-                          <div style={{marginBottom:14}}>
-                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>We Handle Utility Line Clearance (811)</div>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Before any digging starts, we coordinate your 811 utility inspection for you. A team comes out to locate and mark any underground lines — electrical, gas, water, sewer, and internet — running through the dig area, so excavation happens safely with nothing damaged. It's a required step before any inground project, and we manage the entire process on your behalf. One less thing for you to schedule or worry about.</p>
-                          </div>
-                          <div>
-                            <div style={{fontWeight:700,fontSize:12,color:"#4a5c3a",marginBottom:6,borderBottom:"1px solid #e5e7eb",paddingBottom:4}}>Drainage</div>
-                            <p style={{fontSize:12,color:"#444",lineHeight:1.7,margin:0}}>Inground pits sit below grade, so they naturally collect rainwater. A proper drainage system is what keeps the trampoline usable year-round instead of sitting over standing water.</p>
-                          </div>
-                        </div>
-                      )}
+                      <ScopeSectionList sections={poolSections}/>
+                      {hasTrampoline&&<TrampolineInfo/>}
                     </div>
                   }
                 </div>
@@ -528,6 +537,8 @@ function Editor({quote,rates,onSave,onCancel,onDelete,saveStatus,smartAddDefault
   const hasPool=cats.has("plaster")||cats.has("tile")||cats.has("coping");
   const hasTrampoline=cats.has("trampoline");
   const hasScopeService=hasPool||hasTrampoline;
+  // With custom scope on, the old free-text "Customize" only applies to the trampoline section.
+  const showLegacyCustomize=hasScopeService&&(!q.custom_scope_enabled||hasTrampoline);
   const s=sub(q),d=dsc(q),t=tx(q),total_=tot(q);
 
   return(
@@ -614,7 +625,7 @@ function Editor({quote,rates,onSave,onCancel,onDelete,saveStatus,smartAddDefault
         <div style={{background:CARD,borderRadius:10,padding:16,marginBottom:14,borderLeft:`3px solid ${OLIVE}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={secTitle}>Scope of Work</div>
-            {hasScopeService&&!q.custom_scope_enabled&&(
+            {showLegacyCustomize&&(
               <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#9ca3af",cursor:"pointer"}}>
                 <input type="checkbox" checked={!!q.editScope} onChange={e=>set("editScope",e.target.checked)}/>
                 Customize
@@ -648,10 +659,10 @@ function Editor({quote,rates,onSave,onCancel,onDelete,saveStatus,smartAddDefault
               })}
             </div>
           )}
-          {!q.custom_scope_enabled&&hasScopeService&&(q.editScope
-            ?<textarea value={q.customScope||""} onChange={e=>set("customScope",e.target.value)} placeholder="Type your custom scope or notes here..." style={{...inp,height:160,resize:"vertical"}}/>
-            :<div style={{fontSize:12,color:"#6b7280",lineHeight:1.6}}>
-              {[hasPool?"Pool remodeling scope of work will auto-attach (Resurfacing → Tile → Coping + Final Inspection).":null,
+          {showLegacyCustomize&&(q.editScope
+            ?<textarea value={q.customScope||""} onChange={e=>set("customScope",e.target.value)} placeholder={q.custom_scope_enabled?"Replaces the trampoline Important Information section...":"Type your custom scope or notes here..."} style={{...inp,height:160,resize:"vertical",marginTop:q.custom_scope_enabled?10:0}}/>
+            :<div style={{fontSize:12,color:"#6b7280",lineHeight:1.6,marginTop:q.custom_scope_enabled?10:0}}>
+              {[hasPool&&!q.custom_scope_enabled?"Pool remodeling scope of work will auto-attach (Resurfacing → Tile → Coping + Final Inspection).":null,
                 hasTrampoline?"Important information section will auto-attach.":null]
                 .filter(Boolean).join(" ")}
             </div>
