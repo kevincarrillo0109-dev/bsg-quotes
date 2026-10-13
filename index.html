@@ -499,10 +499,16 @@ function PrintView({q,onBack}){
 function ClientView({qid}){
   const[q,setQ]=React.useState(null);
   const[loading,setLoading]=React.useState(true);
-  React.useEffect(()=>{dbGetOne(qid).then(data=>{setQ(data);setLoading(false);});},[]);
+  // Refetch whenever the quote ID changes, ignoring a slower response for a previous ID.
+  React.useEffect(()=>{
+    let stale=false;
+    setQ(null);setLoading(true);
+    dbGetOne(qid).then(data=>{if(stale)return;setQ(data);setLoading(false);});
+    return()=>{stale=true;};
+  },[qid]);
   if(loading)return<div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"100vh",background:"#fff",fontFamily:"Georgia,serif",fontSize:16}}>Loading your quote...</div>;
   if(!q)return<div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"100vh",background:"#fff"}}>Quote not found.</div>;
-  return<PrintView q={q}/>;
+  return<PrintView key={qid} q={q}/>;
 }
 
 // ─── Editor ──────────────────────────────────────────────
@@ -1028,11 +1034,11 @@ function App(){
   // Check for client-facing view via ?q= param
   const urlParams=new URLSearchParams(window.location.search);
   const qParam=urlParams.get("q");
-  if(qParam){return<ClientView qid={qParam}/>;}
+  if(qParam){return<ClientView key={qParam} qid={qParam}/>;}
 
   // Legacy hash support
   const hash=window.location.hash.replace("#","");
-  if(hash.startsWith("quote/")){return<ClientView qid={hash.replace("quote/","")}/>;}
+  if(hash.startsWith("quote/")){const hid=hash.replace("quote/","");return<ClientView key={hid} qid={hid}/>;}
 
   React.useEffect(()=>{dbGetAll().then(rows=>{setQuotes(rows.map(r=>JSON.parse(r.data)));setLoading(false);});},[]);
   React.useEffect(()=>{
@@ -1148,6 +1154,10 @@ function App(){
   );
 }
 
+// Opening a second quote link in the same tab can change only the hash (old #quote/ links)
+// or restore the previous page from the back/forward cache — reload so the new quote loads.
+window.addEventListener("hashchange",()=>location.reload());
+window.addEventListener("pageshow",e=>{if(e.persisted)location.reload();});
 ReactDOM.render(<App/>,document.getElementById("root"));
 </script>
 </body>
